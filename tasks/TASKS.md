@@ -72,14 +72,29 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 - **Contexto**: `docs/06-backend-laravel.md` §3 · `docs/02-arquitectura.md` §8
 - **Entregable**: `TagStateMachine`, enums `TagState` y `MovementType`
 - **Aceptación**: prueba parametrizada sobre las 100 combinaciones estado×estado
-- [ ]
+- [x] Las 100 combinaciones cubiertas con matriz escrita a mano (no derivada
+  de la propia clase, que no probaría nada). 126 pruebas en total.
+- **Discrepancia resuelta**: la tabla de `docs/02` §8 y el código de `docs/06`
+  §3 no coinciden. Se implementó `docs/06` §3 porque las dos transiciones que
+  añade son obligatorias: `cambio_zona` va de `en_stock` a `en_stock`, y
+  vender una prenda en `no_visto` (estaba en la tienda, solo no se leyó) exige
+  `no_visto → vendido`. Sin ellas, mover una prenda de zona o venderla en caja
+  lanzaría excepción. Conviene alinear la tabla de `docs/02`.
 
 ### 1.4 🔒 StockMovementService
 - **Contexto**: `docs/06-backend-laravel.md` §2
 - **Entregable**: `StockMovementService` con `apply()` y `applyBulk()`, `MovementIntent`
 - **Aceptación**: las pruebas de integración de `docs/15` §3 pasan, incluidas concurrencia y trigger append-only
 - **Regla arquitectónica**: ninguna otra clase escribe en `stock_movements` ni muta `tags.state`
-- [ ]
+- [x] 15 pruebas de integración contra PostgreSQL real. La de concurrencia usa
+  dos sesiones de verdad (conexión `pgsql_second`): con la fila bloqueada el
+  segundo movimiento espera y agota el `lock_timeout`, y el estado queda
+  coherente. El trigger append-only rechaza UPDATE y DELETE.
+- **Ojo para la tarea 3.2**: tal como define `docs/06` §2, un movimiento
+  conserva `current_location_id` si la intención no la repite, pero **borra**
+  `current_zone_id`. Para una venta es correcto; para un ajuste que solo
+  confirme presencia en un ciclo, hay que pasar `toZoneId` explícitamente o la
+  prenda se quedará sin zona. Queda documentado con una prueba.
 
 ### 1.5 Reserva de seriales
 - **Contexto**: `docs/04-codificacion-epc.md` §3.2

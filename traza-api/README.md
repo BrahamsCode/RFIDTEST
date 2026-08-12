@@ -72,6 +72,8 @@ lo ya etiquetado.
 | `GET /api/v1/health` | Hecho |
 | Sanctum, Horizon, Reverb instalados | Hecho |
 | Migraciones del esquema (15) | Hecho — tarea 1.1 |
-| Codec SGTIN-96 (requiere GMP) | Pendiente — tarea 1.2 |
-| `StockMovementService` | Pendiente — tarea 1.4 |
+| `TagStateMachine` y enums | Hecho — tarea 1.3 |
+| `StockMovementService` y `MovementIntent` | Hecho — tarea 1.4 |
+| Codec SGTIN-96 (requiere GMP) | Pendiente — tarea 1.2, bloqueada por la 0.2 |
+| Reserva de seriales (envoltorio PHP) | Pendiente — tarea 1.5 |
 | Endpoint de ingesta | Pendiente — tarea 2.1 |
