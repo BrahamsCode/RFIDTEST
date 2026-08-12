@@ -188,18 +188,33 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 - **Contexto**: `docs/05-modelo-de-datos.md` §2.4
 - **Entregable**: `InventoryCycleService::create()` que puebla `inventory_cycle_expected`
 - **Aceptación**: una venta posterior al arranque no altera la lista de esperados
-- [ ]
+- [x] Verificado. El congelado usa `INSERT ... SELECT`, no trae los tags a PHP.
+  Soporta alcance por zona.
 
 ### 3.2 Registro de escaneos
 - **Entregable**: `POST /api/v1/inventory-cycles/{id}/scans` con deduplicación por EPC
 - **Aceptación**: 20 000 EPC en lotes de 500 se registran en < 30 s
-- [ ]
+- [x] **1,18 s** para 20 000 EPC, muy por debajo del límite. Deduplica dentro
+  del lote y entre lotes, acumulando conteos y quedándose con el RSSI máximo.
 
 ### 3.3 🔒 CycleReconciler
 - **Contexto**: `docs/06-backend-laravel.md` §5
 - **Entregable**: reconciliación con las 3 poblaciones calculadas en SQL y umbral `missing_cycles_threshold`
 - **Aceptación**: una prenda no vista una vez → `no_visto`; dos veces → `perdido`. Nunca `perdido` en el primer ciclo
-- [ ]
+- [x] Las tres poblaciones en SQL. Criterio verificado con dos ciclos
+  encadenados.
+- **Hueco corregido en `docs/05` §2.4**: dice "encontrados → sin acción", pero
+  los esperados incluyen `no_visto`. Sin acción, una prenda reencontrada
+  conservaría `missed_cycles = 1` y el siguiente ciclo con un fallo de lectura
+  la declararía merma, **borrando stock real que se había visto hace un
+  ciclo**. Se aplica la transición `no_visto → en_stock (reaparece)` que sí
+  recoge `docs/02` §8, y que resetea el contador.
+- **Corrección de robustez**: `docs/06` §5 selecciona los perdidos con
+  `missed_cycles >= umbral AND state != perdido`, lo que incluiría prendas en
+  `en_stock`; la máquina de estados prohíbe `en_stock → perdido` y la
+  conciliación entera reventaría. Se restringe a `no_visto` y `en_transito`.
+- **Nota**: la clave de configuración se llama `missing_cycles_threshold`, como
+  en `docs/06` §5 (antes estaba como `missing_threshold`).
 
 ### 3.4 Difusión de progreso
 - **Contexto**: `docs/06-backend-laravel.md` §8

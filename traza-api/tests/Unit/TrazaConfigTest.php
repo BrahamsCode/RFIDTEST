@@ -25,7 +25,7 @@ final class TrazaConfigTest extends TestCase
     public function test_el_umbral_de_perdida_nunca_es_uno_por_defecto(): void
     {
         // Un umbral de 1 borraría stock real ante un simple fallo de lectura.
-        $this->assertGreaterThanOrEqual(2, config('traza.inventory.missing_threshold'));
+        $this->assertGreaterThanOrEqual(2, config('traza.inventory.missing_cycles_threshold'));
     }
 
     public function test_la_confianza_del_portal_esta_entre_cero_y_uno(): void

@@ -24,11 +24,11 @@ return [
     |--------------------------------------------------------------------------
     | Ciclos de inventario
     |--------------------------------------------------------------------------
-    | missing_threshold = 1 borra stock real ante un simple fallo de lectura;
-    | 5 detecta la merma demasiado tarde. Ver docs/05 §2.4.
+    | missing_cycles_threshold = 1 borra stock real ante un simple fallo de
+    | lectura; 5 detecta la merma demasiado tarde. Ver docs/05 §2.4.
     */
     'inventory' => [
-        'missing_threshold' => (int) env('TRAZA_MISSING_THRESHOLD', 2),
+        'missing_cycles_threshold' => (int) env('TRAZA_MISSING_THRESHOLD', 2),
         'autoclose_minutes' => (int) env('TRAZA_CYCLE_AUTOCLOSE', 240),
         'min_accuracy' => (float) env('TRAZA_MIN_ACCURACY', 95.0),
     ],

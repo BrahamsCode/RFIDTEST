@@ -76,6 +76,7 @@ lo ya etiquetado.
 | `StockMovementService` y `MovementIntent` | Hecho — tarea 1.4 |
 | Ingesta de lecturas y latido | Hecho — tarea 2.1 |
 | `ProcessReadBatch` (clonación por TID) | Parcial — tarea 2.2, falta el enrutado |
+| Ciclos de inventario y conciliación | Hecho — tareas 3.1, 3.2 y 3.3 |
 | Codec SGTIN-96 (requiere GMP) | Pendiente — tarea 1.2, bloqueada por la 0.2 |
 | Reserva de seriales (envoltorio PHP) | Pendiente — tarea 1.5 |
 
@@ -86,6 +87,9 @@ lo ya etiquetado.
 | `GET /api/v1/health` | ninguna | Estado de base de datos y Redis |
 | `POST /api/v1/ingest/reads` | token de dispositivo | Ingesta de lecturas, idempotente por `batch_id` |
 | `POST /api/v1/ingest/heartbeat` | token de dispositivo | Latido del borde |
+| `POST /api/v1/inventory-cycles/{id}/scans` | token de dispositivo | Escaneos del handheld, deduplicados por EPC |
+| `GET /api/v1/inventory-cycles/{id}` | Sanctum | Estado y avance del ciclo |
+| `POST /api/v1/inventory-cycles/{id}/reconcile` | Sanctum | Concilia y cierra el ciclo |
 | `GET /api/v1/user` | Sanctum | Usuario autenticado |
 
 El borde y el handheld no tienen sesión: presentan `X-Device-Code` y
