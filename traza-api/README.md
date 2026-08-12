@@ -77,6 +77,7 @@ lo ya etiquetado.
 | Ingesta de lecturas y latido | Hecho — tarea 2.1 |
 | `ProcessReadBatch` (clonación por TID) | Parcial — tarea 2.2, falta el enrutado |
 | Ciclos de inventario y conciliación | Hecho — tareas 3.1, 3.2 y 3.3 |
+| Recepción, transferencias, ventas, re-etiquetado | Servicios hechos — épica 7; faltan endpoints de 7.1 y 7.3 |
 | Codec SGTIN-96 (requiere GMP) | Pendiente — tarea 1.2, bloqueada por la 0.2 |
 | Reserva de seriales (envoltorio PHP) | Pendiente — tarea 1.5 |
 

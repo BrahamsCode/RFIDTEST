@@ -353,25 +353,33 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 - **Contexto**: `docs/10-procesos-operativos.md` P02
 - **Entregable**: órdenes, recepción por lectura, pantalla de diferencias
 - **Aceptación**: diferencia > 3 % exige confirmación de supervisor
-- [ ]
+- [~] `ReceivingService` con `recordPass()`, `differences()` y `accept()`.
+  Umbral del 3 % verificado. Repetir la pasada no duplica movimientos, que es
+  lo que P02 pide poder hacer antes de reclamar al proveedor.
+  **Falta la pantalla web** (épica 4).
 
 ### 7.2 Transferencias entre ubicaciones
 - **Contexto**: `docs/10-procesos-operativos.md` P08
 - **Entregable**: flujo despacho/recepción con estado `en_transito` y alerta a 7 días
 - **Aceptación**: prueba E2E de transferencia completa entre LIM-01 y LIM-02
-- [ ]
+- [x] Despacho, recepción y detección de estancadas. Lo que sale y no llega se
+  queda en `en_transito`, que es como se ven las pérdidas en transporte.
 
 ### 7.3 Ventas y devoluciones
 - **Contexto**: `docs/10-procesos-operativos.md` P06, P07
 - **Entregable**: endpoints de venta con EPC y devolución con verificación
 - **Aceptación**: una devolución de un EPC nunca vendido se rechaza con mensaje claro
-- [ ]
+- [~] `SaleService` con los tres rechazos de devolución: EPC ajeno, EPC nunca
+  vendido y prenda ya devuelta. Un EPC desconocido no impide cobrar, como
+  manda P06: el RFID nunca bloquea una venta.
+  **Faltan los endpoints HTTP**; el servicio está listo y probado.
 
 ### 7.4 Re-etiquetado
 - **Contexto**: `docs/10-procesos-operativos.md` P11
 - **Entregable**: sustitución registrada en `tag_replacements`
 - **Aceptación**: una prenda re-etiquetada no se cuenta dos veces en el ciclo siguiente
-- [ ]
+- [x] Verificado creando un ciclo tras la sustitución: espera 1 prenda, no 2.
+  El tag viejo pasa a `baja` y el nuevo hereda ubicación y zona.
 
 ---
 
