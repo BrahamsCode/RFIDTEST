@@ -1,0 +1,64 @@
+# traza-edge
+
+Middleware RFID de borde. Se despliega en cada tienda. Ver `docs/07-middleware-rfid.md`.
+
+Es un componente **desechable**: si se reinstala desde cero no se pierde ningún
+dato de negocio, solo lo que hubiera en su buffer local.
+
+## Puesta en marcha
+
+```bash
+npm install
+cp ../infra/.env.example .env      # ajustar TRAZA_API_URL y TRAZA_DEVICE_TOKEN
+npm run dev
+```
+
+Sin lector físico no hay que hacer nada especial: `READER_MODE=simulator` es el
+valor por defecto.
+
+## Comandos
+
+| Comando | Qué hace |
+|---|---|
+| `npm run dev` | Arranca con recarga en caliente |
+| `npm run build` | Compila a `dist/` |
+| `npm start` | Ejecuta lo compilado |
+| `npm run typecheck` | Comprobación de tipos sin emitir |
+| `npm test` | Pruebas con Vitest |
+
+## Escenarios del simulador
+
+Se elige con `SIMULATOR_SCENARIO`. Todos son reproducibles fijando
+`SIMULATOR_SEED`.
+
+| Escenario | Qué valida |
+|---|---|
+| `inventario_limpio` | Camino feliz, rendimiento de ingesta |
+| `inventario_dificil` | Umbral de `missed_cycles`, filtro de máscara |
+| `portal_salida` | Clasificación de dirección |
+| `portal_dudoso` | Que NO se dispare la alarma |
+| `vecino_ruidoso` | Filtro de máscara |
+| `red_caida` | Buffer y vaciado con retroceso |
+| `avalancha` | Contrapresión y límites de memoria |
+
+## Observabilidad
+
+- `GET :9100/health` — estado y profundidad del buffer
+- `GET :9100/metrics` — formato Prometheus
+
+La métrica más útil es `traza_edge_reads_dropped_total{stage="epc_mask"}`. Si
+sube de golpe, o el vecino instaló RFID, o entró mercadería sin tarar.
+
+## Estado de implementación
+
+| Pieza | Estado |
+|---|---|
+| Configuración validada con zod | Hecho |
+| Pipeline de 5 etapas | Hecho |
+| Simulador con los 7 escenarios | Hecho |
+| Buffer SQLite + vaciado con retroceso | Hecho |
+| Latido y métricas | Hecho |
+| Apagado ordenado | Hecho |
+| `LlrpAdapter` / `HttpWebhookAdapter` | Pendiente — tarea 2.7, depende de la 0.1 |
+| Publicación MQTT del portal | Pendiente — tarea 6.2 |
+| Impresión ZPL | Pendiente |

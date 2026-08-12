@@ -132,8 +132,40 @@ Es importante fijar expectativas desde el documento fundacional:
 
 ---
 
-## 6. Estado del proyecto
+## 6. Estructura del repositorio
 
-Este documento describe el sistema **objetivo**. En el momento de escribirlo no existe implementación. El documento 14 define las fases; la Fase 0 (piloto de una tienda, un handheld, sin portal) es el mínimo viable para validar los supuestos de RF antes de comprometer capital en hardware fijo.
+```
+README.md              Este documento
+docs/                  Los 15 documentos técnicos
+sql/                   DDL, semilla y vistas analíticas
+infra/                 Compose de desarrollo y producción, Mosquitto
+tasks/TASKS.md         Backlog ejecutable
+traza-api/             Backend Laravel 11
+traza-web/             Aplicación web Vite + React 18
+traza-edge/            Middleware RFID de borde (Node + TypeScript)
+traza-handheld/        Aplicación Android (Kotlin)
+```
+
+Cada proyecto tiene su propio `README.md` con puesta en marcha y estado de
+implementación tarea por tarea.
+
+### Arranque del entorno completo
+
+```bash
+cp infra/.env.example infra/.env      # rellenar antes de arrancar
+docker compose -f infra/docker-compose.yml up -d
+```
+
+Sin lector físico no hace falta nada más: `traza-edge` arranca en modo
+simulador por defecto.
+
+---
+
+## 7. Estado del proyecto
+
+Este documento describe el sistema **objetivo**. La implementación está en la
+Fase 0: existen los cuatro proyectos con sus cimientos y el simulador de
+lector, pero el modelo de datos aún no está migrado a Laravel ni hay ingesta.
+Ver `tasks/TASKS.md` para el detalle. El documento 14 define las fases; la Fase 0 (piloto de una tienda, un handheld, sin portal) es el mínimo viable para validar los supuestos de RF antes de comprometer capital en hardware fijo.
 
 > **Recomendación fuerte**: no comprar portales, túneles ni impresoras RFID hasta haber completado la Fase 0 y medido tasas de lectura reales sobre tu propio surtido de prendas. Los números de la industria se calculan sobre catálogos que probablemente no se parecen al tuyo.

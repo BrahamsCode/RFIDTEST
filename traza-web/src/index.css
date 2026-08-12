@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: theme('fontFamily.sans');
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-900;
+  }
+}
+
+@layer components {
+  /* Un EPC de 24 hexadecimales es ilegible en proporcional, y compararlos
+     visualmente es una tarea real de soporte. */
+  .epc {
+    font-family: theme('fontFamily.mono');
+    letter-spacing: -0.01em;
+  }
+
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+}

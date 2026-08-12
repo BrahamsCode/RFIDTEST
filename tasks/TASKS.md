@@ -33,7 +33,10 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 - **Entregable**: `traza-api` (Laravel 11), `traza-web` (Vite+React+TS), `traza-edge` (Node+TS), `traza-handheld` (Kotlin)
 - **Aceptación**: los cuatro arrancan en local; `docker compose up` levanta el entorno completo
 - **Referencia**: `infra/docker-compose.yml`
-- [ ]
+- [~] Los cuatro proyectos arrancan y sus pruebas pasan. `docker compose config`
+  valida en dev y prod, pero **falta verificar `docker compose up` con un daemon
+  real**: el entorno donde se construyó no tenía Docker. Se cierra cuando alguien
+  lo levante en OrbStack.
 
 ### 0.4 Pipeline de CI
 - **Contexto**: `docs/11-infraestructura-docker.md` §4
@@ -102,26 +105,30 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 - **Contexto**: `docs/07-middleware-rfid.md` §2, §3
 - **Entregable**: proyecto TypeScript con configuración validada por zod, tipos base, arranque y apagado ordenado
 - **Aceptación**: `SIGTERM` vacía a SQLite sin perder lecturas en vuelo
-- [ ]
+- [x] Verificado: con 11 132 lecturas en vuelo, tras `SIGTERM` quedaron 11 166
+  filas en SQLite (se volcó lo pendiente en memoria en lugar de perderlo).
 
 ### 2.4 🔒 Simulador de lector
 - **Contexto**: `docs/07-middleware-rfid.md` §8
 - **Entregable**: `SimulatorAdapter` con los 7 escenarios predefinidos
 - **Aceptación**: cada escenario es reproducible con semilla fija; se usa en todas las pruebas del borde
 - **Prioridad alta**: desbloquea el desarrollo sin hardware
-- [ ]
+- [x] Los 7 escenarios definidos y deterministas (PRNG mulberry32 con semilla).
 
 ### 2.5 Pipeline de filtrado
 - **Contexto**: `docs/07-middleware-rfid.md` §4
 - **Entregable**: las 5 etapas + `Pipeline` con contadores
 - **Aceptación**: escenario `vecino_ruidoso` → 0 lecturas ajenas pasan; `DedupeStage` no crece indefinidamente en memoria durante 20 min
-- [ ]
+- [x] Las 5 etapas con contadores. Corregido un fallo del código de ejemplo del
+  doc: `DedupeStage` anclaba el barrido al reloj de pared en vez de a la marca
+  de la lectura, así que nunca se disparaba y el mapa crecía sin límite.
 
 ### 2.6 Buffer offline y vaciado
 - **Contexto**: `docs/07-middleware-rfid.md` §7
 - **Entregable**: `SqliteBuffer` con WAL, `Flusher` con retroceso exponencial
 - **Aceptación**: escenario `red_caida` → 0 lecturas perdidas en 10 min sin API
-- [ ]
+- [~] Implementado y probado contra la API real: 763 lecturas retenidas ante
+  404 con retroceso exponencial, sin pérdida. Falta la prueba larga de 10 min.
 
 ### 2.7 Adaptador de lector real
 - **Contexto**: `docs/07-middleware-rfid.md` §5
@@ -220,7 +227,8 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 - **Contexto**: `docs/09-app-handheld.md` §3, §11
 - **Entregable**: interfaz `RfidReader` + `FakeRfidReader`
 - **Aceptación**: toda la app se puede desarrollar y probar sin hardware
-- [ ]
+- [x] En `core:reader`, módulo Kotlin JVM sin dependencias de Android: se
+  compila y se prueba sin SDK ni hardware. 12 pruebas pasando.
 
 ### 5.2 Modo inventario
 - **Contexto**: `docs/09-app-handheld.md` §5

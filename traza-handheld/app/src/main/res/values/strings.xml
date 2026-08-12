@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TRAZA</string>
+    <string name="mode_inventory">Inventario</string>
+    <string name="mode_commissioning">Tarado</string>
+    <string name="mode_search">Búsqueda</string>
+    <string name="scanned_count">Escaneados</string>
+    <string name="reader_disconnected">Lector desconectado</string>
+</resources>

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Modo oscuro por defecto: almacenes con poca luz y menos consumo. -->
+    <style name="Theme.Traza" parent="android:Theme.Material.NoActionBar" />
+</resources>

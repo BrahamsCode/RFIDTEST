@@ -1,0 +1,19 @@
+# Dependencias
+node_modules/
+vendor/
+
+# Compilados
+dist/
+build/
+.gradle/
+
+# Entornos: nunca versionar los rellenos
+.env
+.env.*
+!.env.example
+
+# Locales
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+.DS_Store
