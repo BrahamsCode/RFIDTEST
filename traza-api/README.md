@@ -74,6 +74,20 @@ lo ya etiquetado.
 | Migraciones del esquema (15) | Hecho — tarea 1.1 |
 | `TagStateMachine` y enums | Hecho — tarea 1.3 |
 | `StockMovementService` y `MovementIntent` | Hecho — tarea 1.4 |
+| Ingesta de lecturas y latido | Hecho — tarea 2.1 |
+| `ProcessReadBatch` (clonación por TID) | Parcial — tarea 2.2, falta el enrutado |
 | Codec SGTIN-96 (requiere GMP) | Pendiente — tarea 1.2, bloqueada por la 0.2 |
 | Reserva de seriales (envoltorio PHP) | Pendiente — tarea 1.5 |
-| Endpoint de ingesta | Pendiente — tarea 2.1 |
+
+## Endpoints
+
+| Método y ruta | Autenticación | Qué hace |
+|---|---|---|
+| `GET /api/v1/health` | ninguna | Estado de base de datos y Redis |
+| `POST /api/v1/ingest/reads` | token de dispositivo | Ingesta de lecturas, idempotente por `batch_id` |
+| `POST /api/v1/ingest/heartbeat` | token de dispositivo | Latido del borde |
+| `GET /api/v1/user` | Sanctum | Usuario autenticado |
+
+El borde y el handheld no tienen sesión: presentan `X-Device-Code` y
+`X-Device-Token`. El token se guarda hasheado, así que el dispositivo se
+localiza por su código y luego se verifica.

@@ -23,11 +23,25 @@ export class ApiClient {
   constructor(
     private readonly baseUrl: string,
     private readonly deviceToken: string,
+    private readonly deviceCode: string,
     private readonly timeoutMs = 15_000,
   ) {}
 
   async postReads(batchId: string, reads: ProcessedTagRead[]): Promise<void> {
-    await this.post('/api/v1/ingest/reads', { batch_id: batchId, reads });
+    await this.post('/api/v1/ingest/reads', {
+      device_code: this.deviceCode,
+      batch_id: batchId,
+      reads: reads.map((r) => ({
+        epc: r.epc,
+        tid: r.tid,
+        antenna: r.antennaPort,
+        rssi: r.rssi,
+        phase_angle: r.phaseAngle,
+        doppler_hz: r.dopplerHz,
+        read_at: new Date(r.lastSeen).toISOString(),
+        read_count: r.readCount,
+      })),
+    });
   }
 
   async postHeartbeat(payload: HeartbeatPayload): Promise<void> {
@@ -45,6 +59,7 @@ export class ApiClient {
           'content-type': 'application/json',
           accept: 'application/json',
           'x-device-token': this.deviceToken,
+          'x-device-code': this.deviceCode,
         },
         body: JSON.stringify(body),
         signal: controller.signal,

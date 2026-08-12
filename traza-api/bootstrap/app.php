@@ -12,7 +12,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        //
+        // El borde y el handheld se autentican con token de dispositivo, no
+        // con sesión de usuario.
+        $middleware->alias([
+            'device' => \App\Http\Middleware\AuthenticateDevice::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

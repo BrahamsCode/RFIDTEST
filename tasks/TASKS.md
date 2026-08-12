@@ -115,13 +115,28 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 - **Contexto**: `docs/06-backend-laravel.md` §4
 - **Entregable**: `POST /api/v1/ingest/reads`, `ReadIngestionService`, middleware `AuthenticateDevice`, `EpcMask`
 - **Aceptación**: idempotencia por `batch_id`; EPC fuera de máscara rechazados sin llegar a `tag_reads`; inserción por lotes de 500
-- [ ]
+- [x] Los tres criterios verificados con 16 pruebas. Se añade también
+  `POST /api/v1/ingest/heartbeat`, que el borde ya llamaba.
+- **Prueba de extremo a extremo**: el borde real contra la API real dejó 1386
+  lecturas de 150 EPC en `tag_reads`, ninguna ajena, todas en la partición del
+  mes y `tag_reads_default` vacía.
 
 ### 2.2 Job ProcessReadBatch
 - **Contexto**: `docs/06-backend-laravel.md` §4.4
 - **Entregable**: job con detección de clonación por TID y enrutado por tipo de dispositivo
 - **Aceptación**: un EPC con dos TID distintos genera alerta `tid_discrepante`
-- [ ]
+- [~] Hechos: resolución de tags, registro de `unknown_epcs` y detección de
+  clonación por TID con alerta `tid_discrepante` (criterio de aceptación
+  cumplido). **Falta el enrutado por tipo de dispositivo**, que necesita
+  `InventoryCycleService` (tarea 3.1) y `PortalEventService` (tarea 6.x).
+- **⚠️ Defecto de diseño en `docs/06` §4.4**: el job recibe `batchId` pero la
+  consulta no filtra por él; selecciona por dispositivo y los últimos 10
+  minutos. Con el borde vaciando cada segundo, cada lote reprocesa toda la
+  ventana: el trabajo crece de forma cuadrática y `unknown_epcs.seen_count` se
+  infla (medido: 2240 avistamientos para 1386 lecturas reales). Arreglarlo
+  bien pide una columna `batch_id` en `tag_reads`, que es un cambio del modelo
+  de datos y necesita decisión de negocio. **Pendiente de resolver antes de
+  producción.**
 
 ### 2.3 🔒 Esqueleto de traza-edge
 - **Contexto**: `docs/07-middleware-rfid.md` §2, §3

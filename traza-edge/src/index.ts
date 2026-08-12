@@ -66,7 +66,7 @@ async function main(): Promise<void> {
   ]);
 
   const buffer = new SqliteBuffer(env.EDGE_BUFFER_PATH, env.EDGE_BUFFER_MAX_ROWS);
-  const api = new ApiClient(env.TRAZA_API_URL, env.TRAZA_DEVICE_TOKEN);
+  const api = new ApiClient(env.TRAZA_API_URL, env.TRAZA_DEVICE_TOKEN, env.TRAZA_DEVICE_CODE);
   const flusher = new Flusher(buffer, api, env.EDGE_FLUSH_BATCH);
 
   let connected = false;
