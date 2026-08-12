@@ -1,0 +1,263 @@
+# =============================================================================
+#  TRAZA — Entorno de desarrollo
+#  Uso:  docker compose -f infra/docker-compose.yml up -d
+#  Pensado para OrbStack en macOS. Funciona igual con Docker Desktop.
+# =============================================================================
+
+name: traza-dev
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Base de datos
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: traza-postgres
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-traza}
+      POSTGRES_USER: ${DB_USERNAME:-traza}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+      # Necesario para que los ENUM en español no den problemas de ordenación
+      POSTGRES_INITDB_ARGS: "--locale=es_PE.UTF-8 --encoding=UTF8"
+      LANG: es_PE.utf8
+    command:
+      - postgres
+      - -c
+      - shared_buffers=512MB
+      - -c
+      - work_mem=32MB
+      - -c
+      - maintenance_work_mem=256MB
+      - -c
+      - max_connections=200
+      # Registro de consultas lentas: imprescindible al ajustar la ingesta
+      - -c
+      - log_min_duration_statement=500
+      - -c
+      - track_io_timing=on
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../sql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-traza} -d ${DB_DATABASE:-traza}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Cola, caché y locks
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: traza-redis
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy noeviction
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Broker MQTT — canal rápido de eventos de portal
+  # ---------------------------------------------------------------------------
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: traza-mqtt
+    ports:
+      - "1883:1883"   # MQTT
+      - "9001:9001"   # WebSocket
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-logs:/mosquitto/log
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # API (Laravel)
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: ../traza-api
+      dockerfile: Dockerfile
+      target: development
+    container_name: traza-api
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      DB_HOST: postgres
+      DB_PORT: 5432
+      REDIS_HOST: redis
+      QUEUE_CONNECTION: redis
+      BROADCAST_CONNECTION: reverb
+      MQTT_HOST: mosquitto
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../traza-api:/var/www/html
+      - /var/www/html/vendor          # el vendor del contenedor gana
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: php artisan serve --host=0.0.0.0 --port=8000
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Trabajos en cola
+  # ---------------------------------------------------------------------------
+  horizon:
+    build:
+      context: ../traza-api
+      target: development
+    container_name: traza-horizon
+    environment:
+      DB_HOST: postgres
+      REDIS_HOST: redis
+      QUEUE_CONNECTION: redis
+    volumes:
+      - ../traza-api:/var/www/html
+    depends_on:
+      - api
+    command: php artisan horizon
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Tareas programadas
+  # ---------------------------------------------------------------------------
+  scheduler:
+    build:
+      context: ../traza-api
+      target: development
+    container_name: traza-scheduler
+    environment:
+      DB_HOST: postgres
+      REDIS_HOST: redis
+    volumes:
+      - ../traza-api:/var/www/html
+    depends_on:
+      - api
+    command: php artisan schedule:work
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # WebSocket (tiempo real)
+  # ---------------------------------------------------------------------------
+  reverb:
+    build:
+      context: ../traza-api
+      target: development
+    container_name: traza-reverb
+    environment:
+      DB_HOST: postgres
+      REDIS_HOST: redis
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../traza-api:/var/www/html
+    depends_on:
+      - api
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Middleware de borde (con simulador activado en desarrollo)
+  # ---------------------------------------------------------------------------
+  edge:
+    build:
+      context: ../traza-edge
+      dockerfile: Dockerfile
+      target: development
+    container_name: traza-edge
+    environment:
+      NODE_ENV: development
+      TRAZA_API_URL: http://api:8000
+      TRAZA_DEVICE_CODE: EDGE-DEV-01
+      TRAZA_DEVICE_TOKEN: ${EDGE_DEVICE_TOKEN:-dev-token}
+      MQTT_URL: mqtt://mosquitto:1883
+      # ★ Sin lector físico: el simulador produce lecturas sintéticas
+      READER_MODE: simulator
+      SIMULATOR_SCENARIO: ${SIMULATOR_SCENARIO:-inventario_limpio}
+      SIMULATOR_POPULATION: "5000"
+      SIMULATOR_MISS_RATE: "0.03"
+      SIMULATOR_STRAY_RATE: "0.02"
+      EPC_MASK: "3035D9"
+    ports:
+      - "9100:9100"   # métricas Prometheus
+    volumes:
+      - ../traza-edge:/app
+      - /app/node_modules
+      - edge-buffer:/app/data
+    depends_on:
+      - api
+      - mosquitto
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Aplicación web
+  # ---------------------------------------------------------------------------
+  web:
+    build:
+      context: ../traza-web
+      target: development
+    container_name: traza-web
+    environment:
+      VITE_API_URL: http://localhost:8000
+      VITE_REVERB_HOST: localhost
+      VITE_REVERB_PORT: "8080"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../traza-web:/app
+      - /app/node_modules
+    command: npm run dev -- --host 0.0.0.0
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Almacenamiento de objetos (imágenes de producto, exportaciones Parquet)
+  # ---------------------------------------------------------------------------
+  minio:
+    image: minio/minio:latest
+    container_name: traza-minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER:-traza}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-secret123}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Correo de pruebas
+  # ---------------------------------------------------------------------------
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: traza-mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:
+  mosquitto-data:
+  mosquitto-logs:
+  edge-buffer:
+
+networks:
+  default:
+    name: traza-net
