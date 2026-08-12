@@ -436,9 +436,11 @@ final class ApiSurfaceTest extends TestCase
             ->assertOk()
             ->json('zones');
 
-        $porCodigo = collect($zones)->keyBy('code');
-        $this->assertSame('100.0', (string) $porCodigo['SALA']['pct']);
-        $this->assertSame('0.0', (string) $porCodigo['TRAS']['pct']);
+        $porNombre = collect($zones)->keyBy('zone_name');
+        $this->assertSame('100.00', (string) $porNombre['Sala']['accuracy_pct']);
+        $this->assertSame('0.00', (string) $porNombre['Trastienda']['accuracy_pct']);
+        // La peor barrida sale primera.
+        $this->assertSame('Trastienda', $zones[0]['zone_name']);
     }
 
     public function test_pausar_un_ciclo_cerrado_es_conflicto(): void

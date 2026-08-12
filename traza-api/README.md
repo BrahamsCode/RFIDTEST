@@ -79,7 +79,8 @@ lo ya etiquetado.
 | Ciclos de inventario y conciliación | Hecho — tareas 3.1, 3.2 y 3.3 |
 | Recepción, transferencias, ventas, re-etiquetado | Hecho — épica 7 |
 | Superficie REST con RFC 7807, paginación e idempotencia | Hecho — `docs/06` §6 |
-| Catálogo, stock, dispositivos, lotes de etiquetas | Pendiente — dependen de 1.2 y 8.1 |
+| Vistas y funciones analíticas | Hecho — tarea 8.1 |
+| Catálogo, stock, dispositivos, lotes de etiquetas | Pendiente — endpoints; las vistas ya están |
 | Codec SGTIN-96 (requiere GMP) | Pendiente — tarea 1.2, bloqueada por la 0.2 |
 | Reserva de seriales (envoltorio PHP) | Pendiente — tarea 1.5 |
 

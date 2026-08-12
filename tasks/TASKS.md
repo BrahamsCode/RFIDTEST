@@ -225,11 +225,9 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 ### 3.5 Rendimiento por zona
 - **Entregable**: endpoint que expone `cycle_zone_performance()`
 - **Aceptación**: identifica correctamente una zona no barrida en el escenario de prueba
-- [~] `GET /inventory-cycles/{id}/zone-performance` funcionando y probado: en
-  un ciclo con sala barrida y trastienda sin barrer devuelve 100 % y 0 %.
-- **Ojo**: la consulta va contra las tablas, no contra la función SQL
-  `cycle_zone_performance()` de `sql/vistas-analiticas.sql`, que aún no está
-  aplicada. Se cierra al hacer la tarea 8.1.
+- [x] `GET /inventory-cycles/{id}/zone-performance` sobre la función SQL
+  `cycle_zone_performance()`, ya disponible tras la tarea 8.1. Devuelve las
+  zonas ordenadas por exactitud ascendente: la peor barrida sale primera.
 
 ---
 
@@ -393,7 +391,13 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 ### 8.1 Vistas y funciones analíticas
 - **Entregable**: aplicar `sql/vistas-analiticas.sql` como migración
 - **Aceptación**: las 7 vistas y 3 funciones devuelven datos coherentes con la semilla
-- [ ]
+- [x] Migración `2026_08_01_000120_create_analytic_views`. Verificado con
+  `pg_dump`: aplicar `schema.sql` + `vistas-analiticas.sql` por un lado y las
+  migraciones por otro da **1566 líneas idénticas**.
+- Las 7 vistas, la materializada `mv_daily_stock` y las 3 funciones, con 16
+  pruebas de coherencia. Incluye el control de integridad de `docs/05` §6:
+  `v_current_stock` y `stock_as_of()` coinciden, o sea que la proyección
+  `tags` no se ha desviado de `stock_movements`.
 
 ### 8.2 Rotación de particiones
 - **Contexto**: `docs/05-modelo-de-datos.md` §5

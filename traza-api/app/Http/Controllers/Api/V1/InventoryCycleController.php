@@ -167,25 +167,11 @@ final class InventoryCycleController extends Controller
      */
     public function zonePerformance(InventoryCycle $inventoryCycle): JsonResponse
     {
-        $rows = DB::table('inventory_cycle_expected as e')
-            ->leftJoin('zones as z', 'z.id', '=', 'e.zone_id')
-            ->leftJoin('inventory_cycle_scans as s', function ($join) use ($inventoryCycle): void {
-                $join->on('s.tag_id', '=', 'e.tag_id')
-                    ->where('s.inventory_cycle_id', '=', $inventoryCycle->id);
-            })
-            ->where('e.inventory_cycle_id', $inventoryCycle->id)
-            ->groupBy('z.id', 'z.code', 'z.name')
-            ->orderBy('z.code')
-            ->get([
-                'z.id as zone_id',
-                'z.code',
-                'z.name',
-                DB::raw('count(*) as expected'),
-                DB::raw('count(s.tag_id) as found'),
-                DB::raw('round(100.0 * count(s.tag_id) / nullif(count(*), 0), 1) as pct'),
-            ]);
-
-        return response()->json(['zones' => $rows]);
+        // La función ordena por exactitud ascendente: la zona peor barrida
+        // sale primera, que es la que hay que mirar.
+        return response()->json([
+            'zones' => DB::select('SELECT * FROM cycle_zone_performance(?)', [$inventoryCycle->id]),
+        ]);
     }
 
     /** @return array<string, mixed> */
