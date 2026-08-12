@@ -420,7 +420,7 @@ final class InventoryCycleTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->postJson("/api/v1/inventory-cycles/{$cycle->id}/reconcile")
+            ->postJson("/api/v1/inventory-cycles/{$cycle->id}/close")
             ->assertStatus(409);
     }
 

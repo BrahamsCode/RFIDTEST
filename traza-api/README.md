@@ -77,22 +77,38 @@ lo ya etiquetado.
 | Ingesta de lecturas y latido | Hecho — tarea 2.1 |
 | `ProcessReadBatch` (clonación por TID) | Parcial — tarea 2.2, falta el enrutado |
 | Ciclos de inventario y conciliación | Hecho — tareas 3.1, 3.2 y 3.3 |
-| Recepción, transferencias, ventas, re-etiquetado | Servicios hechos — épica 7; faltan endpoints de 7.1 y 7.3 |
+| Recepción, transferencias, ventas, re-etiquetado | Hecho — épica 7 |
+| Superficie REST con RFC 7807, paginación e idempotencia | Hecho — `docs/06` §6 |
+| Catálogo, stock, dispositivos, lotes de etiquetas | Pendiente — dependen de 1.2 y 8.1 |
 | Codec SGTIN-96 (requiere GMP) | Pendiente — tarea 1.2, bloqueada por la 0.2 |
 | Reserva de seriales (envoltorio PHP) | Pendiente — tarea 1.5 |
 
 ## Endpoints
 
-| Método y ruta | Autenticación | Qué hace |
-|---|---|---|
-| `GET /api/v1/health` | ninguna | Estado de base de datos y Redis |
-| `POST /api/v1/ingest/reads` | token de dispositivo | Ingesta de lecturas, idempotente por `batch_id` |
-| `POST /api/v1/ingest/heartbeat` | token de dispositivo | Latido del borde |
-| `POST /api/v1/inventory-cycles/{id}/scans` | token de dispositivo | Escaneos del handheld, deduplicados por EPC |
-| `GET /api/v1/inventory-cycles/{id}` | Sanctum | Estado y avance del ciclo |
-| `POST /api/v1/inventory-cycles/{id}/reconcile` | Sanctum | Concilia y cierra el ciclo |
-| `GET /api/v1/user` | Sanctum | Usuario autenticado |
+Superficie de `docs/06` §6. `php artisan route:list --path=api/v1` da la lista viva.
 
-El borde y el handheld no tienen sesión: presentan `X-Device-Code` y
-`X-Device-Token`. El token se guarda hasheado, así que el dispositivo se
-localiza por su código y luego se verifica.
+**Token de dispositivo** (borde y handheld, sin sesión):
+
+| Ruta | Qué hace |
+|---|---|
+| `POST /api/v1/ingest/reads` | Ingesta de lecturas, idempotente por `batch_id` |
+| `POST /api/v1/ingest/heartbeat` | Latido del borde |
+| `POST /api/v1/inventory-cycles/{id}/scans` | Escaneos del handheld, deduplicados por EPC |
+
+**Sesión de usuario** (Sanctum): tags y su historial, ciclos de inventario
+(crear, arrancar, pausar, cerrar, informe, avance por zona), movimientos y
+transferencias, órdenes de recepción, ventas y devoluciones, y la bandeja de
+alertas.
+
+### Convenciones
+
+| Aspecto | Cómo |
+|---|---|
+| Errores | RFC 7807, `application/problem+json` |
+| Paginación | `?page=` y `?per_page=` (máximo 200), con `meta.total` |
+| Idempotencia | Cabecera `Idempotency-Key` en los POST que mutan stock |
+| Autenticación de dispositivo | `X-Device-Code` y `X-Device-Token`; el token se guarda hasheado |
+
+`Idempotency-Key` no es opcional en la práctica: sin ella, un reintento por
+timeout de red cobra, recibe o transfiere dos veces la misma mercadería. La
+respuesta original se reproduce con la cabecera `Idempotent-Replay: true`.

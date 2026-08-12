@@ -5,31 +5,93 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Inventory\CycleReconciler;
+use App\Enums\CycleScope;
+use App\Enums\CycleStatus;
+use App\Http\Concerns\Paginates;
 use App\Http\Controllers\Controller;
+use App\Http\Problem;
 use App\Http\Requests\RegisterScansRequest;
 use App\Models\InventoryCycle;
+use App\Models\Location;
 use App\Services\InventoryCycleService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 final class InventoryCycleController extends Controller
 {
+    use Paginates;
+
     public function __construct(
         private readonly InventoryCycleService $cycles,
     ) {}
 
+    public function index(Request $request): JsonResponse
+    {
+        $query = InventoryCycle::query()
+            ->when($request->filled('location'), fn ($q) => $q->where('location_id', $request->integer('location')))
+            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
+            ->orderByDesc('id');
+
+        return response()->json($this->paginated($query, $request, fn (InventoryCycle $c) => [
+            'id' => $c->id,
+            'code' => $c->code,
+            'status' => $c->status,
+            'expected_count' => $c->expected_count,
+            'accuracy_pct' => $c->accuracy_pct,
+            'started_at' => $c->started_at,
+            'closed_at' => $c->closed_at,
+        ]));
+    }
+
+    /** Crear un ciclo congela la lista de esperados. Ver `docs/05` §2.4. */
+    public function store(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'location_id' => ['required', 'integer', 'exists:locations,id'],
+            'code' => ['required', 'string', 'max:32'],
+            'scope' => ['sometimes', 'string', 'in:total,zona,categoria,muestreo'],
+            'zone_ids' => ['sometimes', 'array'],
+            'zone_ids.*' => ['integer', 'exists:zones,id'],
+        ]);
+
+        $cycle = $this->cycles->create(
+            location: Location::findOrFail($data['location_id']),
+            code: $data['code'],
+            scope: CycleScope::from($data['scope'] ?? 'total'),
+            zoneIds: $data['zone_ids'] ?? [],
+            startedBy: $request->user()?->id,
+        );
+
+        return response()->json($this->present($cycle), 201);
+    }
+
     public function show(InventoryCycle $inventoryCycle): JsonResponse
     {
-        return response()->json([
-            'id' => $inventoryCycle->id,
-            'code' => $inventoryCycle->code,
-            'status' => $inventoryCycle->status,
-            'expected_count' => $inventoryCycle->expected_count,
-            'scanned_count' => $this->cycles->scannedCount($inventoryCycle),
-            'started_at' => $inventoryCycle->started_at,
-            'closed_at' => $inventoryCycle->closed_at,
-            'accuracy_pct' => $inventoryCycle->accuracy_pct,
-        ]);
+        return response()->json($this->present($inventoryCycle));
+    }
+
+    public function start(InventoryCycle $inventoryCycle): JsonResponse
+    {
+        if ($inventoryCycle->status->isFinished()) {
+            return Problem::conflict('El ciclo ya está cerrado.');
+        }
+
+        $inventoryCycle->update(['status' => CycleStatus::EnCurso]);
+
+        return response()->json($this->present($inventoryCycle->refresh()));
+    }
+
+    public function pause(InventoryCycle $inventoryCycle): JsonResponse
+    {
+        if ($inventoryCycle->status !== CycleStatus::EnCurso) {
+            return Problem::conflict('Solo se puede pausar un ciclo en curso.');
+        }
+
+        $inventoryCycle->update(['status' => CycleStatus::Pausado]);
+
+        return response()->json($this->present($inventoryCycle->refresh()));
     }
 
     public function storeScans(
@@ -40,7 +102,7 @@ final class InventoryCycleController extends Controller
 
         // Un dispositivo no puede escribir en el ciclo de otra organización.
         if ($device->organization_id !== $inventoryCycle->organization_id) {
-            return response()->json(['message' => 'El ciclo no pertenece a esta organización.'], 403);
+            return Problem::forbidden('El ciclo no pertenece a esta organización.');
         }
 
         try {
@@ -50,7 +112,7 @@ final class InventoryCycleController extends Controller
                 $device->id,
             );
         } catch (RuntimeException $e) {
-            return response()->json(['message' => $e->getMessage()], 409);
+            return Problem::conflict($e->getMessage());
         }
 
         return response()->json([
@@ -59,10 +121,11 @@ final class InventoryCycleController extends Controller
         ], 202);
     }
 
-    public function reconcile(InventoryCycle $inventoryCycle, CycleReconciler $reconciler): JsonResponse
+    /** Cerrar dispara la conciliación. */
+    public function close(InventoryCycle $inventoryCycle, CycleReconciler $reconciler): JsonResponse
     {
         if ($inventoryCycle->status->isFinished()) {
-            return response()->json(['message' => 'El ciclo ya está cerrado.'], 409);
+            return Problem::conflict('El ciclo ya está cerrado.');
         }
 
         $result = $reconciler->reconcile($inventoryCycle);
@@ -75,5 +138,73 @@ final class InventoryCycleController extends Controller
             'counted' => $result->counted(),
             'accuracy_pct' => $inventoryCycle->fresh()->accuracy_pct,
         ]);
+    }
+
+    /** Informe de conciliación por variante. */
+    public function report(InventoryCycle $inventoryCycle): JsonResponse
+    {
+        $rows = DB::table('inventory_cycle_results as r')
+            ->join('product_variants as v', 'v.id', '=', 'r.product_variant_id')
+            ->where('r.inventory_cycle_id', $inventoryCycle->id)
+            ->orderBy('r.difference_qty')
+            ->get([
+                'v.sku',
+                'r.expected_qty',
+                'r.counted_qty',
+                'r.difference_qty',
+                'r.value_difference',
+            ]);
+
+        return response()->json([
+            'cycle' => $this->present($inventoryCycle),
+            'lines' => $rows,
+        ]);
+    }
+
+    /**
+     * Avance por zona. Sirve para detectar la zona que nadie barrió, que es
+     * la causa más habitual de un ciclo con mala exactitud.
+     */
+    public function zonePerformance(InventoryCycle $inventoryCycle): JsonResponse
+    {
+        $rows = DB::table('inventory_cycle_expected as e')
+            ->leftJoin('zones as z', 'z.id', '=', 'e.zone_id')
+            ->leftJoin('inventory_cycle_scans as s', function ($join) use ($inventoryCycle): void {
+                $join->on('s.tag_id', '=', 'e.tag_id')
+                    ->where('s.inventory_cycle_id', '=', $inventoryCycle->id);
+            })
+            ->where('e.inventory_cycle_id', $inventoryCycle->id)
+            ->groupBy('z.id', 'z.code', 'z.name')
+            ->orderBy('z.code')
+            ->get([
+                'z.id as zone_id',
+                'z.code',
+                'z.name',
+                DB::raw('count(*) as expected'),
+                DB::raw('count(s.tag_id) as found'),
+                DB::raw('round(100.0 * count(s.tag_id) / nullif(count(*), 0), 1) as pct'),
+            ]);
+
+        return response()->json(['zones' => $rows]);
+    }
+
+    /** @return array<string, mixed> */
+    private function present(InventoryCycle $cycle): array
+    {
+        return [
+            'id' => $cycle->id,
+            'code' => $cycle->code,
+            'status' => $cycle->status,
+            'scope' => $cycle->scope,
+            'location_id' => $cycle->location_id,
+            'expected_count' => $cycle->expected_count,
+            'scanned_count' => $this->cycles->scannedCount($cycle),
+            'found_count' => $cycle->found_count,
+            'missing_count' => $cycle->missing_count,
+            'unexpected_count' => $cycle->unexpected_count,
+            'accuracy_pct' => $cycle->accuracy_pct,
+            'started_at' => $cycle->started_at,
+            'closed_at' => $cycle->closed_at,
+        ];
     }
 }

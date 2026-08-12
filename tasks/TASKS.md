@@ -225,7 +225,11 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 ### 3.5 Rendimiento por zona
 - **Entregable**: endpoint que expone `cycle_zone_performance()`
 - **Aceptación**: identifica correctamente una zona no barrida en el escenario de prueba
-- [ ]
+- [~] `GET /inventory-cycles/{id}/zone-performance` funcionando y probado: en
+  un ciclo con sala barrida y trastienda sin barrer devuelve 100 % y 0 %.
+- **Ojo**: la consulta va contra las tablas, no contra la función SQL
+  `cycle_zone_performance()` de `sql/vistas-analiticas.sql`, que aún no está
+  aplicada. Se cierra al hacer la tarea 8.1.
 
 ---
 
@@ -353,10 +357,11 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 - **Contexto**: `docs/10-procesos-operativos.md` P02
 - **Entregable**: órdenes, recepción por lectura, pantalla de diferencias
 - **Aceptación**: diferencia > 3 % exige confirmación de supervisor
-- [~] `ReceivingService` con `recordPass()`, `differences()` y `accept()`.
-  Umbral del 3 % verificado. Repetir la pasada no duplica movimientos, que es
-  lo que P02 pide poder hacer antes de reclamar al proveedor.
-  **Falta la pantalla web** (épica 4).
+- [x] `ReceivingService` más los endpoints `GET/POST /receiving-orders` y
+  `POST /receiving-orders/{id}/receive`. Umbral del 3 % verificado: devuelve
+  409 con las diferencias dentro para que la pantalla pida confirmación.
+  Repetir la pasada no duplica movimientos, que es lo que P02 pide poder
+  hacer antes de reclamar al proveedor. **La pantalla web es de la épica 4.**
 
 ### 7.2 Transferencias entre ubicaciones
 - **Contexto**: `docs/10-procesos-operativos.md` P08
@@ -369,10 +374,10 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 - **Contexto**: `docs/10-procesos-operativos.md` P06, P07
 - **Entregable**: endpoints de venta con EPC y devolución con verificación
 - **Aceptación**: una devolución de un EPC nunca vendido se rechaza con mensaje claro
-- [~] `SaleService` con los tres rechazos de devolución: EPC ajeno, EPC nunca
-  vendido y prenda ya devuelta. Un EPC desconocido no impide cobrar, como
-  manda P06: el RFID nunca bloquea una venta.
-  **Faltan los endpoints HTTP**; el servicio está listo y probado.
+- [x] `POST /sales` y `POST /sales/{id}/return`. Los tres rechazos de
+  devolución (EPC ajeno, nunca vendido, ya devuelto) salen en RFC 7807 con su
+  mensaje. Un EPC desconocido no impide cobrar, como manda P06: el RFID nunca
+  bloquea una venta.
 
 ### 7.4 Re-etiquetado
 - **Contexto**: `docs/10-procesos-operativos.md` P11

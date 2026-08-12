@@ -1,8 +1,12 @@
 <?php
 
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -16,8 +20,31 @@ return Application::configure(basePath: dirname(__DIR__))
         // con sesión de usuario.
         $middleware->alias([
             'device' => \App\Http\Middleware\AuthenticateDevice::class,
+            'idempotency' => \App\Http\Middleware\EnsureIdempotency::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        // Los errores de la API se sirven en RFC 7807, que es la convención
+        // que fija `docs/06` §6.
+        $exceptions->render(function (Throwable $e, Request $request) {
+            if (! $request->is('api/*')) {
+                return null;
+            }
+
+            if ($e instanceof ValidationException) {
+                return \App\Http\Problem::make(
+                    422,
+                    'Los datos enviados no son válidos',
+                    'Revise el campo "errors" para el detalle.',
+                    'https://traza.pe/problems/validation',
+                    ['errors' => $e->errors()],
+                );
+            }
+
+            if ($e instanceof ModelNotFoundException || $e instanceof NotFoundHttpException) {
+                return \App\Http\Problem::make(404, 'No encontrado');
+            }
+
+            return null;
+        });
     })->create();
