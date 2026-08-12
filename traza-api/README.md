@@ -27,8 +27,25 @@ docker compose -f ../infra/docker-compose.yml up -d
 | `php artisan reverb:start` | WebSocket para tiempo real |
 | `php artisan test` | Pruebas |
 
-Las pruebas corren sobre SQLite en memoria. Las que dependan del esquema
-PostgreSQL real (particiones, ENUM, triggers) deben apuntar al contenedor.
+Las pruebas corren sobre SQLite en memoria y las que dependen del esquema
+PostgreSQL real se saltan solas. Para ejecutarlas:
+
+```bash
+DB_CONNECTION=pgsql php artisan test --group=pgsql
+```
+
+## ⚠️ `migrate:fresh` necesita `--drop-types`
+
+```bash
+php artisan migrate:fresh --drop-types
+```
+
+`migrate:fresh` a secas borra las tablas pero **no** los tipos ENUM de
+PostgreSQL. La primera vez funciona; la segunda falla con
+`type "tag_state" already exists`. No es un fallo del esquema, es cómo
+funciona Laravel: `--drop-types` existe justo para esto.
+
+Las funciones no dan problema porque se declaran con `CREATE OR REPLACE`.
 
 ## Regla arquitectónica
 
@@ -54,7 +71,7 @@ lo ya etiquetado.
 | `config/traza.php` y `config/mqtt.php` | Hecho |
 | `GET /api/v1/health` | Hecho |
 | Sanctum, Horizon, Reverb instalados | Hecho |
-| Migraciones del esquema | Pendiente — tarea 1.1 |
+| Migraciones del esquema (15) | Hecho — tarea 1.1 |
 | Codec SGTIN-96 (requiere GMP) | Pendiente — tarea 1.2 |
 | `StockMovementService` | Pendiente — tarea 1.4 |
 | Endpoint de ingesta | Pendiente — tarea 2.1 |

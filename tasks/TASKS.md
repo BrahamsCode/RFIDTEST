@@ -52,7 +52,14 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 - **Contexto**: `docs/05-modelo-de-datos.md` §7 · fuente: `sql/schema.sql`
 - **Entregable**: 14 migraciones Laravel en el orden indicado, incluidos ENUM vía `DB::unprepared`, la tabla particionada y el trigger append-only
 - **Aceptación**: `php artisan migrate:fresh` reproduce exactamente `sql/schema.sql`; `php artisan migrate:rollback` funciona
-- [ ]
+- [x] Verificado comparando `pg_dump --schema-only` de las dos vías sobre
+  PostgreSQL 16: **1358 líneas idénticas**, sin una sola diferencia. El
+  rollback deshace las 15 migraciones y deja 0 tipos ENUM. 11 pruebas de
+  invariantes en `tests/Feature/SchemaTest.php`.
+- **Ojo**: son **15** migraciones, no 14 — es el número de entradas que lista
+  `docs/05` §7. Y en PostgreSQL hay que usar `migrate:fresh --drop-types`:
+  `migrate:fresh` a secas no borra los tipos ENUM y falla en la segunda
+  ejecución.
 
 ### 1.2 🔒 Codec SGTIN-96
 - **Contexto**: `docs/04-codificacion-epc.md` §4
