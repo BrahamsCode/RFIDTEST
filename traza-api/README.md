@@ -59,9 +59,28 @@ Los parámetros de negocio viven en `config/traza.php`, no dispersos por el
 código: esquema EPC, umbral de prendas no vistas, gracia del portal y límites
 de ingesta.
 
-⚠️ `TRAZA_GS1_COMPANY_PREFIX` debe obtenerse de GS1 Perú antes de emitir
-etiquetas (tarea 0.2). Cambiar el esquema EPC después de tarar invalida todo
-lo ya etiquetado.
+## Codificación EPC
+
+El sistema soporta **SGTIN-96 y GID-96 a la vez** (ADR-009). `EpcCodecFactory`
+deduce el esquema por la cabecera del propio EPC, así que migrar de uno a otro
+no obliga a re-etiquetar el inventario existente.
+
+- **SGTIN-96** (`0x30`) requiere prefijo de compañía GS1. Es el único camino a
+  interoperar con proveedores y marketplaces.
+- **GID-96** (`0x35`) no requiere GS1 y sirve para arrancar, pero **no es
+  interoperable**: ningún socio comercial podrá leer esos EPC.
+
+Sin `TRAZA_GS1_COMPANY_PREFIX`, emitir etiquetas SGTIN falla con un mensaje
+que remite a la tarea 0.2. Para arrancar sin GS1, poner
+`TRAZA_EPC_SCHEME=gid-96`.
+
+El grupo `epc` se ejecuta aparte en CI para que su fallo sea inconfundible:
+
+```bash
+php artisan test --group=epc
+```
+
+Un error ahí corrompe identificadores de forma silenciosa e irreversible.
 
 ## Estado de implementación
 
@@ -80,6 +99,8 @@ lo ya etiquetado.
 | Recepción, transferencias, ventas, re-etiquetado | Hecho — épica 7 |
 | Superficie REST con RFC 7807, paginación e idempotencia | Hecho — `docs/06` §6 |
 | Vistas y funciones analíticas | Hecho — tarea 8.1 |
+| Codecs SGTIN-96 y GID-96 con su factoría | Hecho — tarea 1.2 |
+| Reserva concurrente de seriales | Hecho — tarea 1.5 |
 | Catálogo, stock, dispositivos, lotes de etiquetas | Pendiente — endpoints; las vistas ya están |
 | Codec SGTIN-96 (requiere GMP) | Pendiente — tarea 1.2, bloqueada por la 0.2 |
 | Reserva de seriales (envoltorio PHP) | Pendiente — tarea 1.5 |

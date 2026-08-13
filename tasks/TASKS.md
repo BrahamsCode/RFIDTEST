@@ -66,7 +66,25 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 - **Entregable**: `Sgtin96Codec`, `Gid96Codec`, interfaz `EpcCodec`, `EpcCodecFactory`
 - **Aceptación**: el grupo de pruebas `epc` pasa, incluido `encode('7751234','012345',1000000042) === '3035D919080C0E403B9ACA2A'` y las pruebas por propiedades de `docs/15` §2
 - **Requiere**: extensión GMP en el Dockerfile
-- [ ]
+- [x] Vector de referencia exacto, las 7 particiones de ida y vuelta, y las
+  pruebas por propiedades con 500 entradas aleatorias. 43 pruebas en el grupo
+  `epc`.
+- **No estaba bloqueada.** Se dio por bloqueada por la tarea 0.2 durante
+  varias sesiones, y era un error de lectura: el prefijo de compañía es un
+  **parámetro** de `encode()`, no configuración. Lo que 0.2 decide es qué
+  esquema se usa en producción, no si el codec se puede escribir.
+- **Decisión técnica: no se usa GMP.** `BitField` compone los 96 bits con una
+  cadena de bits, que es igual de exacta y no depende de ninguna extensión de
+  PHP: un requisito menos que puede faltar en el mini-PC de una tienda. La
+  extensión sigue en el Dockerfile por si otra cosa la necesita.
+- **Corrección sobre `docs/04` §4**: el método `toGtin13()` del documento
+  devuelve 14 dígitos, no 13. En SGTIN la suma de dígitos de prefijo y
+  referencia es siempre 13 en todas las particiones, así que con el control
+  salen 14: eso es un **GTIN-14** (y por eso la columna del esquema es
+  `VARCHAR(14)`). Se devuelven ambos: `gtin14` siempre, y `gtin13` solo
+  cuando el dígito indicador es 0, que es el caso de una prenda suelta. Con
+  indicador distinto de 0 se trata de un agrupamiento y no hay EAN-13
+  equivalente, así que devuelve null en vez de un número inventado.
 
 ### 1.3 Máquina de estados del tag
 - **Contexto**: `docs/06-backend-laravel.md` §3 · `docs/02-arquitectura.md` §8
@@ -100,7 +118,12 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 - **Contexto**: `docs/04-codificacion-epc.md` §3.2
 - **Entregable**: función SQL `reserve_serial_range()` + envoltorio PHP
 - **Aceptación**: 10 procesos concurrentes reservando 100 seriales no producen ningún duplicado
-- [ ]
+- [x] Verificado con **diez sesiones de PostgreSQL de verdad**, no diez
+  llamadas seguidas: 1000 seriales, ninguno repetido, de 1 a 1000 sin huecos.
+- `SerialReservationService` reserva y codifica de una vez con
+  `reserveEpcs()`, y avisa si la variante agotó su espacio de seriales.
+  Con `gid-96` no hace falta prefijo GS1, que es la vía de arranque de
+  ADR-009.
 
 ### 1.6 Semilla de desarrollo
 - **Entregable**: seeders Laravel equivalentes a `sql/seeds.sql`

@@ -14,6 +14,12 @@ return [
     'epc' => [
         'scheme' => env('TRAZA_EPC_SCHEME', 'sgtin-96'),
         'gs1_company_prefix' => env('TRAZA_GS1_COMPANY_PREFIX'),
+        /*
+         * Solo para gid-96, que no necesita GS1. Es un valor propio y se
+         * asume el riesgo de colisión con otra empresa: bajo, pero real.
+         * Ver docs/04 §2.2.
+         */
+        'gid_manager_number' => (int) env('TRAZA_GID_MANAGER_NUMBER', 1),
         'filter' => (int) env('TRAZA_EPC_FILTER', 1),
         'mask' => strtoupper((string) env('TRAZA_EPC_MASK', '3035D9')),
         'test_prefix' => strtoupper((string) env('TRAZA_EPC_TEST_PREFIX', 'FFFF')),
