@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
@@ -278,7 +279,7 @@ final class IngestReadsTest extends TestCase
             ->assertStatus(202);
 
         (new ProcessReadBatch('lote', $this->device->id))
-            ->handle(new TagResolver(), new AlertService());
+            ->handle(new TagResolver, new AlertService);
 
         $unknown = DB::table('unknown_epcs')->where('epc', '3035D9000000000000000099')->first();
         $this->assertNotNull($unknown);
@@ -311,7 +312,7 @@ final class IngestReadsTest extends TestCase
         ]))->assertStatus(202);
 
         (new ProcessReadBatch('lote', $this->device->id))
-            ->handle(new TagResolver(), new AlertService());
+            ->handle(new TagResolver, new AlertService);
 
         $alert = Alert::where('kind', AlertKind::TidDiscrepante)->first();
         $this->assertNotNull($alert, 'Debería haberse levantado una alerta de clonación.');
@@ -342,7 +343,7 @@ final class IngestReadsTest extends TestCase
         $this->ingest($this->payload(reads: [$this->read($epc, tid: $tid)]))->assertStatus(202);
 
         (new ProcessReadBatch('lote', $this->device->id))
-            ->handle(new TagResolver(), new AlertService());
+            ->handle(new TagResolver, new AlertService);
 
         $this->assertSame(0, Alert::where('kind', AlertKind::TidDiscrepante)->count());
     }
@@ -378,7 +379,7 @@ final class IngestReadsTest extends TestCase
     }
 
     /** @param array<string, mixed> $payload */
-    private function ingest(array $payload): \Illuminate\Testing\TestResponse
+    private function ingest(array $payload): TestResponse
     {
         return $this->withHeaders(['X-Device-Token' => self::TOKEN])
             ->postJson('/api/v1/ingest/reads', $payload);

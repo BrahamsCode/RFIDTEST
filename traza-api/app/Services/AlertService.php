@@ -40,7 +40,7 @@ final class AlertService
      * Evita inundar la bandeja: si ya hay una alerta abierta del mismo tipo
      * para el mismo tag, no se crea otra.
      *
-     * @param array<string, mixed> $detail
+     * @param  array<string, mixed>  $detail
      */
     public function raiseOnce(
         AlertKind $kind,

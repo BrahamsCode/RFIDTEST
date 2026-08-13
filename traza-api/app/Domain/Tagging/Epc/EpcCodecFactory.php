@@ -19,8 +19,8 @@ final class EpcCodecFactory
     public function __construct()
     {
         $this->codecs = [
-            'sgtin-96' => new Sgtin96Codec(),
-            'gid-96' => new Gid96Codec(),
+            'sgtin-96' => new Sgtin96Codec,
+            'gid-96' => new Gid96Codec,
         ];
     }
 

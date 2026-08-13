@@ -22,7 +22,7 @@ final class Sgtin96CodecTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->codec = new Sgtin96Codec();
+        $this->codec = new Sgtin96Codec;
     }
 
     public function test_coincide_con_el_ejemplo_de_referencia_de_la_documentacion(): void

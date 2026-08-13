@@ -144,7 +144,7 @@ final class PortalEventService
             ->whereBetween('pe.occurred_at', [$from, $to])
             // El universo son los tránsitos que sonaron alguna vez, no todos
             // los tránsitos: un cruce silencioso no es un acierto del portal.
-            ->whereRaw("(pe.alarm_raised OR a.id IS NOT NULL)")
+            ->whereRaw('(pe.alarm_raised OR a.id IS NOT NULL)')
             ->selectRaw('count(*) as alarms')
             ->selectRaw("count(*) FILTER (WHERE a.status = 'descartada' OR NOT pe.alarm_raised) as dismissed")
             ->first();

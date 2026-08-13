@@ -50,6 +50,7 @@ final class ReadIngestionService
             // el servidor nunca confía en la validación del cliente.
             if (! $mask->matches($epc)) {
                 $rejected++;
+
                 continue;
             }
 

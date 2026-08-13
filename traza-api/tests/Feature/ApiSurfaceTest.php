@@ -8,16 +8,21 @@ use App\Domain\Movements\MovementIntent;
 use App\Domain\Tagging\TagStateMachine;
 use App\Enums\AlertKind;
 use App\Enums\MovementType;
+use App\Enums\RoleCode;
 use App\Enums\TagState;
+use App\Models\InventoryCycle;
 use App\Models\Location;
 use App\Models\Organization;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\Role;
 use App\Models\Tag;
 use App\Models\User;
 use App\Models\Zone;
 use App\Services\AlertService;
+use App\Services\InventoryCycleService;
 use App\Services\StockMovementService;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
@@ -53,7 +58,7 @@ final class ApiSurfaceTest extends TestCase
                        stock_movements, tags, role_user, roles, users
                        RESTART IDENTITY CASCADE');
 
-        $this->movements = new StockMovementService(new TagStateMachine());
+        $this->movements = new StockMovementService(new TagStateMachine);
 
         $suffix = uniqid();
         $this->organization = Organization::create(['name' => 'VivaTech Pruebas']);
@@ -75,7 +80,7 @@ final class ApiSurfaceTest extends TestCase
         ]);
         // Con la épica 9 en marcha, un usuario sin rol no puede crear ni
         // cerrar ciclos: hay que darle uno explícitamente.
-        (new \Database\Seeders\RoleSeeder())->run();
+        (new RoleSeeder)->run();
 
         $this->user = User::create([
             'organization_id' => $this->organization->id,
@@ -85,7 +90,7 @@ final class ApiSurfaceTest extends TestCase
             'default_location_id' => $this->tienda->id,
         ]);
         $this->user->roles()->attach(
-            \App\Models\Role::where('code', \App\Enums\RoleCode::JefeTienda->value)->value('id')
+            Role::where('code', RoleCode::JefeTienda->value)->value('id')
         );
         $this->user = $this->user->fresh();
     }
@@ -393,14 +398,14 @@ final class ApiSurfaceTest extends TestCase
 
         // El handheld registra su barrido con token de dispositivo; aquí se
         // usa el servicio para no duplicar la prueba de autenticación.
-        app(\App\Services\InventoryCycleService::class)->registerScans(
-            \App\Models\InventoryCycle::find($cycle['id']),
+        app(InventoryCycleService::class)->registerScans(
+            InventoryCycle::find($cycle['id']),
             array_map(fn (Tag $t) => ['epc' => $t->epc], array_slice($tags, 0, 3)),
         );
 
         // 75 % está por debajo del umbral del 90 %, así que cerrar exige
         // justificación escrita (`docs/12` §2).
-        \App\Models\InventoryCycle::find($cycle['id'])
+        InventoryCycle::find($cycle['id'])
             ->update(['notes' => 'Zona de probadores en obra durante el conteo.']);
 
         $this->actingAs($this->user)
@@ -441,8 +446,8 @@ final class ApiSurfaceTest extends TestCase
         ])->json();
 
         // Solo se barre la sala.
-        app(\App\Services\InventoryCycleService::class)->registerScans(
-            \App\Models\InventoryCycle::find($cycle['id']),
+        app(InventoryCycleService::class)->registerScans(
+            InventoryCycle::find($cycle['id']),
             [['epc' => $tags[0]->epc], ['epc' => $tags[1]->epc]],
         );
 
@@ -466,7 +471,7 @@ final class ApiSurfaceTest extends TestCase
         ])->json();
 
         // Sin escaneos la exactitud es 0 %: hace falta justificar el cierre.
-        \App\Models\InventoryCycle::find($cycle['id'])
+        InventoryCycle::find($cycle['id'])
             ->update(['notes' => 'Ciclo anulado por corte de luz.']);
 
         $this->actingAs($this->user)
@@ -482,7 +487,7 @@ final class ApiSurfaceTest extends TestCase
 
     public function test_la_bandeja_ordena_por_gravedad(): void
     {
-        $alerts = new AlertService();
+        $alerts = new AlertService;
         $alerts->raise(AlertKind::ReposicionSala, organizationId: $this->organization->id);
         $alerts->raise(AlertKind::TidDiscrepante, organizationId: $this->organization->id);
 
@@ -498,7 +503,7 @@ final class ApiSurfaceTest extends TestCase
 
     public function test_reconocer_y_resolver_una_alerta(): void
     {
-        $alert = (new AlertService())->raise(
+        $alert = (new AlertService)->raise(
             AlertKind::SalidaNoVendida, organizationId: $this->organization->id
         );
 
@@ -513,7 +518,7 @@ final class ApiSurfaceTest extends TestCase
 
     public function test_no_se_reconoce_dos_veces_la_misma_alerta(): void
     {
-        $alert = (new AlertService())->raise(
+        $alert = (new AlertService)->raise(
             AlertKind::LectorSinLatido, organizationId: $this->organization->id
         );
 

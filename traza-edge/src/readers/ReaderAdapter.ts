@@ -35,8 +35,10 @@ export const PROFILES: Record<string, ReadProfile> = {
     readTid: false,
   },
   // Tarado: potencia baja deliberada para leer solo el tag que tienes delante.
+  // S0 por la tabla de `docs/09` §4: la persistencia de S1 callaría al tag
+  // tras la primera respuesta y nunca se llegaría a las 2 lecturas mínimas.
   TARADO: {
-    session: 1,
+    session: 0,
     target: 'A',
     initialQ: 2,
     txPowerDbm: 15,

@@ -96,6 +96,18 @@ class ReadProfileTest {
     }
 
     @Test
+    fun `el tarado usa sesion S0 y es coherente con su minimo de lecturas`() {
+        /*
+         * Tabla de `docs/09` §4. No es un detalle: con una sesión que
+         * persiste, el tag se calla tras la primera respuesta y el mínimo de
+         * dos lecturas del perfil no se alcanzaría nunca. El perfil sería
+         * imposible de satisfacer y no se taría ninguna prenda.
+         */
+        assertEquals(0, ReadProfile.TARADO.session)
+        assertTrue(ReadProfile.TARADO.minReadCount >= 2)
+    }
+
+    @Test
     fun `rechaza una sesion Gen2 fuera de rango`() {
         val error = runCatching { ReadProfile.INVENTARIO.copy(session = 9) }.exceptionOrNull()
         assertTrue(error is IllegalArgumentException)

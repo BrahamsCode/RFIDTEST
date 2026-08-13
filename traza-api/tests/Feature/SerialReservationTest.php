@@ -33,7 +33,7 @@ final class SerialReservationTest extends TestCase
 
         DB::statement('TRUNCATE product_variant_counters, tags, stock_movements RESTART IDENTITY CASCADE');
 
-        $this->serials = new SerialReservationService(new EpcCodecFactory());
+        $this->serials = new SerialReservationService(new EpcCodecFactory);
 
         $suffix = uniqid();
         $organization = Organization::create(['name' => 'VivaTech Pruebas']);
@@ -132,7 +132,7 @@ final class SerialReservationTest extends TestCase
     public function test_los_epc_emitidos_decodifican_a_su_variante(): void
     {
         $epcs = $this->serials->reserveEpcs($this->variant, 2);
-        $decoded = (new EpcCodecFactory())->decode($epcs[1]);
+        $decoded = (new EpcCodecFactory)->decode($epcs[1]);
 
         $this->assertSame('7751234', $decoded['companyPrefix']);
         $this->assertSame('012345', $decoded['itemReference']);
@@ -160,7 +160,7 @@ final class SerialReservationTest extends TestCase
         $this->assertStringStartsWith('35', $epcs[0]);
         $this->assertSame(
             $this->variant->id,
-            (new EpcCodecFactory())->decode($epcs[0])['objectClass'],
+            (new EpcCodecFactory)->decode($epcs[0])['objectClass'],
         );
     }
 

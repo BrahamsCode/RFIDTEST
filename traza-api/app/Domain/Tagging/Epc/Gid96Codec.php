@@ -24,7 +24,9 @@ final class Gid96Codec implements EpcCodec
     private const SERIAL_BITS = 36;
 
     public const MANAGER_MAX = 268435455;    // 2^28 - 1
+
     public const CLASS_MAX = 16777215;       // 2^24 - 1
+
     public const SERIAL_MAX = 68719476735;   // 2^36 - 1
 
     public function scheme(): string

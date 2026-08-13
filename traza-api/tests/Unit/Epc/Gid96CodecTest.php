@@ -16,7 +16,7 @@ final class Gid96CodecTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->codec = new Gid96Codec();
+        $this->codec = new Gid96Codec;
     }
 
     public function test_codifica_con_la_cabecera_de_gid96(): void

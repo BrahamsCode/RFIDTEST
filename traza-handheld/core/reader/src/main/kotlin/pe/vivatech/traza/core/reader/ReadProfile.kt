@@ -29,9 +29,16 @@ data class ReadProfile(
         /**
          * Potencia deliberadamente baja: en tarado hay que leer solo el tag
          * que se tiene delante, no la caja entera de la trastienda.
+         *
+         * Sesión S0 según la tabla de `docs/09` §4. Estaba puesta en S1, y
+         * era incompatible con el propio perfil: la persistencia de S1 calla
+         * al tag después de la primera respuesta, así que `minReadCount = 2`
+         * no se alcanzaría nunca y no se taría ninguna prenda. S0 no
+         * persiste, que es lo que se quiere cuando se lee una y otra vez el
+         * mismo tag a diez centímetros.
          */
         val TARADO = ReadProfile(
-            session = 1,
+            session = 0,
             target = "A",
             initialQ = 2,
             txPowerDbm = 15,

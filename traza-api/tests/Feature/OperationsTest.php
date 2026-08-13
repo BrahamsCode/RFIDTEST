@@ -15,6 +15,7 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\ReceivingOrder;
 use App\Models\Tag;
+use App\Models\User;
 use App\Services\InventoryCycleService;
 use App\Services\ReceivingService;
 use App\Services\SaleService;
@@ -58,7 +59,7 @@ final class OperationsTest extends TestCase
                        inventory_cycle_expected, inventory_cycles,
                        stock_movements, tags RESTART IDENTITY CASCADE');
 
-        $this->movements = new StockMovementService(new TagStateMachine());
+        $this->movements = new StockMovementService(new TagStateMachine);
 
         $suffix = uniqid();
         $this->organization = Organization::create(['name' => 'VivaTech Pruebas']);
@@ -84,7 +85,7 @@ final class OperationsTest extends TestCase
             'cost_price' => 40.0, 'sale_price' => 119.9,
         ]);
 
-        $this->userId = \App\Models\User::create([
+        $this->userId = User::create([
             'organization_id' => $this->organization->id,
             'name' => 'Jefa de tienda',
             'email' => "jefa-{$suffix}@vivatech-peru.com",
@@ -346,7 +347,7 @@ final class OperationsTest extends TestCase
         $this->assertSame($viejo->id, $nuevo->replaces_tag_id);
 
         // Lo que importa: el ciclo siguiente espera una prenda, no dos.
-        $cycle = (new InventoryCycleService())->create($this->tienda, 'INV-RE-01');
+        $cycle = (new InventoryCycleService)->create($this->tienda, 'INV-RE-01');
         $this->assertSame(1, $cycle->expected_count);
     }
 
@@ -400,7 +401,7 @@ final class OperationsTest extends TestCase
         $this->sales()->acceptReturn($this->tienda, $tags[0]->epc, 'D-E2E');
 
         // Se hace inventario y se barren las 3.
-        $cycles = new InventoryCycleService();
+        $cycles = new InventoryCycleService;
         $cycle = $cycles->create($this->tienda, 'INV-E2E');
         $this->assertSame(3, $cycle->expected_count);
 

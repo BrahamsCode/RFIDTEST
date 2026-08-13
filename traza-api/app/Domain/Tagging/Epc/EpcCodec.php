@@ -18,7 +18,7 @@ interface EpcCodec
     public function scheme(): string;
 
     /**
-     * @param  string  $prefix     prefijo de compañía (SGTIN) o general manager (GID)
+     * @param  string  $prefix  prefijo de compañía (SGTIN) o general manager (GID)
      * @param  string  $reference  referencia de artículo (SGTIN) u object class (GID)
      */
     public function encode(string $prefix, string $reference, int $serial, int $filter = 1): string;

@@ -11,6 +11,7 @@ use App\Services\AlertService;
 use App\Services\TagResolver;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -85,7 +86,7 @@ final class ProcessReadBatch implements ShouldQueue
      * Mismo EPC leído con un TID distinto al grabado en fábrica: o alguien
      * clonó la etiqueta, o se re-etiquetó sin registrarlo.
      *
-     * @param \Illuminate\Support\Collection<int, object> $epcReads
+     * @param  Collection<int, object>  $epcReads
      */
     private function detectCloning(
         $tag,

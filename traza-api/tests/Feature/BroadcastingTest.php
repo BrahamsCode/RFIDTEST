@@ -12,7 +12,6 @@ use App\Enums\RoleCode;
 use App\Enums\TagState;
 use App\Events\InventoryCycleProgressed;
 use App\Events\PortalAlarmRaised;
-use App\Models\InventoryCycle;
 use App\Models\Location;
 use App\Models\Organization;
 use App\Models\Product;
@@ -56,10 +55,10 @@ final class BroadcastingTest extends TestCase
         DB::statement('TRUNCATE role_user, roles, inventory_cycle_scans,
                        inventory_cycle_expected, inventory_cycles,
                        stock_movements, tags, users RESTART IDENTITY CASCADE');
-        (new RoleSeeder())->run();
+        (new RoleSeeder)->run();
 
-        $this->movements = new StockMovementService(new TagStateMachine());
-        $this->cycles = new InventoryCycleService();
+        $this->movements = new StockMovementService(new TagStateMachine);
+        $this->cycles = new InventoryCycleService;
 
         $suffix = uniqid();
         $this->organization = Organization::create(['name' => 'VivaTech Pruebas']);

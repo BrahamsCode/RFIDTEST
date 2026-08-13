@@ -49,9 +49,9 @@ final class StockEndpointsTest extends TestCase
 
         DB::statement('TRUNCATE alerts, role_user, roles, stock_movements, tags, users
                        RESTART IDENTITY CASCADE');
-        (new RoleSeeder())->run();
+        (new RoleSeeder)->run();
 
-        $this->movements = new StockMovementService(new TagStateMachine());
+        $this->movements = new StockMovementService(new TagStateMachine);
 
         $suffix = uniqid();
         $organization = Organization::create(['name' => 'VivaTech Pruebas']);

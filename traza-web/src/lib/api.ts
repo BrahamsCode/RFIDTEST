@@ -342,3 +342,52 @@ export const portal = {
     await api.post(`/api/v1/portal-events/${id}/false-positive`, { note });
   },
 };
+
+// -------------------------------------------------------- dispositivos
+
+export type DeviceKind = 'handheld' | 'lector_fijo' | 'impresora' | 'edge';
+
+export interface Device {
+  id: number;
+  code: string;
+  name: string;
+  kind: DeviceKind;
+  status: string;
+  location_id: number | null;
+  firmware: string | null;
+  last_seen_at: string | null;
+  is_online: boolean;
+  has_pending_enrollment: boolean;
+}
+
+/** Lo que se codifica en el QR de alta. Ver `docs/09` §10. */
+export interface EnrollmentPayload {
+  v: number;
+  url: string;
+  device_code: string;
+  enrollment_token: string;
+  location_id: number | null;
+}
+
+export interface Enrollment {
+  device_code: string;
+  expires_at: string;
+  expires_in_minutes: number;
+  qr_payload: EnrollmentPayload;
+}
+
+export const devices = {
+  async list(params: Record<string, unknown> = {}): Promise<Paginated<Device>> {
+    const { data } = await api.get('/api/v1/devices', { params });
+    return data;
+  },
+  async enroll(id: number, baseUrl?: string): Promise<Enrollment> {
+    const { data } = await api.post(`/api/v1/devices/${id}/enrollment`, {
+      base_url: baseUrl,
+    });
+    return data;
+  },
+  async revokeEnrollment(id: number): Promise<void> {
+    await api.delete(`/api/v1/devices/${id}/enrollment`);
+  },
+};

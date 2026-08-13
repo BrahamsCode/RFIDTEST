@@ -19,7 +19,7 @@ final class EpcCodecFactoryTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->factory = new EpcCodecFactory();
+        $this->factory = new EpcCodecFactory;
     }
 
     public function test_entrega_el_codec_de_cada_esquema(): void
@@ -47,8 +47,8 @@ final class EpcCodecFactoryTest extends TestCase
     {
         // Lo que permite leer un tag antiguo sin saber cómo se codificó: es
         // la base de poder migrar de GID-96 a SGTIN-96 sin re-etiquetar.
-        $sgtin = (new Sgtin96Codec())->encode('7751234', '012345', 7);
-        $gid = (new Gid96Codec())->encode('12345', '678', 7);
+        $sgtin = (new Sgtin96Codec)->encode('7751234', '012345', 7);
+        $gid = (new Gid96Codec)->encode('12345', '678', 7);
 
         $this->assertSame('sgtin-96', $this->factory->decode($sgtin)['scheme']);
         $this->assertSame('gid-96', $this->factory->decode($gid)['scheme']);
@@ -66,11 +66,11 @@ final class EpcCodecFactoryTest extends TestCase
         // Escenario real de migración: inventario antiguo en GID y
         // etiquetas nuevas en SGTIN, leídos por el mismo sistema.
         $antiguos = array_map(
-            fn (int $i) => (new Gid96Codec())->encode('12345', '678', $i),
+            fn (int $i) => (new Gid96Codec)->encode('12345', '678', $i),
             range(1, 5),
         );
         $nuevos = array_map(
-            fn (int $i) => (new Sgtin96Codec())->encode('7751234', '012345', $i),
+            fn (int $i) => (new Sgtin96Codec)->encode('7751234', '012345', $i),
             range(1, 5),
         );
 

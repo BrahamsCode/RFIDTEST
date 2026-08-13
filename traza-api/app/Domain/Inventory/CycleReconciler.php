@@ -143,7 +143,7 @@ final class CycleReconciler
      * Un solo fallo de lectura no puede borrar stock que existe.
      *
      * @param  Collection<int, int>  $tagIds
-     * @return int  cuántos se declararon perdidos
+     * @return int cuántos se declararon perdidos
      */
     private function applyMissing(InventoryCycle $cycle, Collection $tagIds): int
     {

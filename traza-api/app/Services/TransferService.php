@@ -10,6 +10,7 @@ use App\Enums\TagState;
 use App\Models\Location;
 use App\Models\Tag;
 use App\Models\Transfer;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -42,7 +43,7 @@ final class TransferService
      * Despacha: los tags barridos pasan a `en_transito`.
      *
      * @param  list<string>  $epcs
-     * @return int  prendas despachadas
+     * @return int prendas despachadas
      */
     public function dispatch(Transfer $transfer, array $epcs, ?int $userId = null): int
     {
@@ -144,9 +145,9 @@ final class TransferService
      * Transferencias despachadas hace más de una semana y aún sin recibir.
      * Las pérdidas en transporte son invisibles si nadie las busca.
      *
-     * @return \Illuminate\Support\Collection<int, Transfer>
+     * @return Collection<int, Transfer>
      */
-    public function stale(): \Illuminate\Support\Collection
+    public function stale(): Collection
     {
         return Transfer::query()
             ->where('status', 'en_transito')
@@ -156,9 +157,9 @@ final class TransferService
 
     /**
      * @param  list<string>  $epcs
-     * @return \Illuminate\Support\Collection<int, Tag>
+     * @return Collection<int, Tag>
      */
-    private function resolve(Transfer $transfer, array $epcs): \Illuminate\Support\Collection
+    private function resolve(Transfer $transfer, array $epcs): Collection
     {
         return Tag::query()
             ->where('organization_id', $transfer->organization_id)

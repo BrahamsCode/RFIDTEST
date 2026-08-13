@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\V1\AlertController;
+use App\Http\Controllers\Api\V1\DeviceController;
 use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\IngestController;
 use App\Http\Controllers\Api\V1\InventoryCycleController;
@@ -24,6 +25,16 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
     Route::get('health', HealthController::class)->name('api.v1.health');
+
+    /*
+     * Canje del QR de alta (`docs/09` §10). Es la única ruta sin
+     * credenciales de ninguna clase, porque sirve precisamente para
+     * obtenerlas. La protege el token de alta: un solo uso, 15 minutos, y
+     * un límite estricto para que no se pueda probar a ciegas.
+     */
+    Route::post('devices/enroll', [DeviceController::class, 'redeem'])
+        ->middleware('throttle:10,1')
+        ->name('api.v1.devices.redeem');
 
     // ---------------------------------------------------- token de dispositivo
     Route::middleware('device')->group(function (): void {
@@ -86,6 +97,13 @@ Route::prefix('v1')->group(function (): void {
         Route::get('portal-events/stats', [PortalEventController::class, 'stats'])->name('api.v1.portal.stats');
         Route::post('portal-events/{portalEvent}/false-positive', [PortalEventController::class, 'falsePositive'])
             ->name('api.v1.portal.false-positive');
+
+        // Dispositivos y alta por QR
+        Route::get('devices', [DeviceController::class, 'index'])->name('api.v1.devices.index');
+        Route::post('devices/{device}/enrollment', [DeviceController::class, 'enroll'])
+            ->name('api.v1.devices.enroll');
+        Route::delete('devices/{device}/enrollment', [DeviceController::class, 'revokeEnrollment'])
+            ->name('api.v1.devices.enrollment.revoke');
 
         // ------------------------------------------- POST que mutan stock
         // Llevan Idempotency-Key: un reintento por timeout de red no debe

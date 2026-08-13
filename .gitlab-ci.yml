@@ -1,0 +1,209 @@
+# Pipeline de TRAZA. Ver `docs/11-infraestructura-docker.md` §4.
+#
+# Se aparta del borrador del documento en cuatro puntos, todos por la misma
+# razón: el borrador describe herramientas que este repositorio todavía no
+# tiene, y un pipeline que falla siempre acaba ignorado.
+#
+#   1. No hay phpstan instalado. El lint de PHP es Pint a secas. Añadir
+#      larastan es una tarea propia, no un efecto colateral de montar CI.
+#   2. Las pruebas se ejecutan con PHPUnit y no con Pest: es lo que trae el
+#      proyecto.
+#   3. No hay prueba de carga con k6 todavía; el trabajo queda declarado y
+#      desactivado en vez de rojo.
+#   4. Se añade el handheld, que el borrador no contemplaba. Sus dos módulos
+#      `core:` son Kotlin JVM puro y se prueban sin SDK de Android; el APK
+#      necesita el SDK y va en un trabajo aparte que solo corre en `main`.
+
+stages: [lint, test, build]
+
+variables:
+  DOCKER_BUILDKIT: "1"
+  GIT_DEPTH: "20"
+
+# ---------------------------------------------------------------- LINT
+
+lint:php:
+  stage: lint
+  image: php:8.4-cli-alpine
+  before_script:
+    - apk add --no-cache git unzip
+    - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+    - cd traza-api && composer install --no-interaction --no-progress
+  script:
+    - vendor/bin/pint --test
+  cache:
+    key: composer-$CI_COMMIT_REF_SLUG
+    paths: [traza-api/vendor]
+
+lint:web:
+  stage: lint
+  image: node:22-alpine
+  before_script:
+    - cd traza-web && npm ci
+  script:
+    - npm run lint
+  cache:
+    key: npm-web-$CI_COMMIT_REF_SLUG
+    paths: [traza-web/node_modules]
+
+lint:edge:
+  stage: lint
+  image: node:22-alpine
+  before_script:
+    # better-sqlite3 compila código nativo.
+    - apk add --no-cache python3 make g++
+    - cd traza-edge && npm ci
+  script:
+    - npm run typecheck
+  cache:
+    key: npm-edge-$CI_COMMIT_REF_SLUG
+    paths: [traza-edge/node_modules]
+
+# ---------------------------------------------------------------- TEST
+
+test:api:
+  stage: test
+  image: php:8.4-cli-alpine
+  services:
+    - name: postgres:16-alpine
+      alias: postgres
+    - name: redis:7-alpine
+      alias: redis
+  variables:
+    POSTGRES_DB: traza
+    POSTGRES_USER: traza
+    POSTGRES_PASSWORD: secret
+    DB_CONNECTION: pgsql
+    DB_HOST: postgres
+    DB_PORT: "5432"
+    DB_DATABASE: traza
+    DB_USERNAME: traza
+    DB_PASSWORD: secret
+    REDIS_HOST: redis
+    CACHE_STORE: array
+    SESSION_DRIVER: array
+    QUEUE_CONNECTION: sync
+    APP_KEY: base64:qXQ3lJ3fWZbW1r8m1sT2N8CkXKn0LMrHrJm4nQ0cQ0Y=
+  before_script:
+    - apk add --no-cache git unzip postgresql16-dev linux-headers $PHPIZE_DEPS
+    - docker-php-ext-install pdo_pgsql pcntl
+    - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+    - cd traza-api && composer install --no-interaction --no-progress
+    # `--drop-types` es imprescindible: `migrate:fresh` borra las tablas pero
+    # no los ENUM nativos, y la segunda ejecución fallaría al recrearlos.
+    - php artisan migrate:fresh --drop-types --force
+  script:
+    - php artisan test
+  cache:
+    key: composer-$CI_COMMIT_REF_SLUG
+    paths: [traza-api/vendor]
+
+# El codec EPC va aparte para que su fallo sea inconfundible en el informe:
+# un EPC mal compuesto invalida todas las etiquetas ya impresas, y eso no se
+# arregla con un despliegue.
+test:epc-codec:
+  stage: test
+  image: php:8.4-cli-alpine
+  variables:
+    DB_CONNECTION: sqlite
+    DB_DATABASE: ":memory:"
+    APP_KEY: base64:qXQ3lJ3fWZbW1r8m1sT2N8CkXKn0LMrHrJm4nQ0cQ0Y=
+  before_script:
+    - apk add --no-cache git unzip
+    - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+    - cd traza-api && composer install --no-interaction --no-progress
+  script:
+    - php artisan test --testsuite=Unit
+  allow_failure: false
+  cache:
+    key: composer-$CI_COMMIT_REF_SLUG
+    paths: [traza-api/vendor]
+
+test:web:
+  stage: test
+  image: node:22-alpine
+  before_script:
+    - cd traza-web && npm ci
+  script:
+    - npm test
+  cache:
+    key: npm-web-$CI_COMMIT_REF_SLUG
+    paths: [traza-web/node_modules]
+
+test:edge:
+  stage: test
+  image: node:22-alpine
+  before_script:
+    - apk add --no-cache python3 make g++
+    - cd traza-edge && npm ci
+  script:
+    - npm test
+  cache:
+    key: npm-edge-$CI_COMMIT_REF_SLUG
+    paths: [traza-edge/node_modules]
+
+# Sin SDK de Android: `settings.gradle.kts` excluye `:app` cuando no hay
+# ANDROID_HOME, así que esto compila y prueba solo los módulos `core:`. Es
+# barato y cubre toda la lógica de los cinco modos.
+test:handheld-core:
+  stage: test
+  image: eclipse-temurin:21-jdk
+  before_script:
+    - cd traza-handheld
+  script:
+    - ./gradlew :core:reader:test :core:domain:test --no-daemon
+  cache:
+    key: gradle-$CI_COMMIT_REF_SLUG
+    paths: [traza-handheld/.gradle, traza-handheld/build]
+
+test:carga:
+  stage: test
+  image: grafana/k6:latest
+  script:
+    - k6 run --vus 50 --duration 60s tests/load/ingest.js
+  # Desactivado hasta que exista el guion de carga. Declararlo aquí y no
+  # borrarlo deja constancia de que falta; ejecutarlo lo dejaría rojo para
+  # siempre y el pipeline se acabaría ignorando entero.
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $RUN_LOAD_TESTS == "true"'
+
+# ---------------------------------------------------------------- BUILD
+
+build:images:
+  stage: build
+  image: docker:27
+  services: [docker:27-dind]
+  script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+    - docker build --target production -t "$CI_REGISTRY_IMAGE/traza-api:$CI_COMMIT_SHA" ./traza-api
+    - docker build --target production -t "$CI_REGISTRY_IMAGE/traza-edge:$CI_COMMIT_SHA" ./traza-edge
+    - docker push "$CI_REGISTRY_IMAGE/traza-api:$CI_COMMIT_SHA"
+    - docker push "$CI_REGISTRY_IMAGE/traza-edge:$CI_COMMIT_SHA"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+build:web:
+  stage: build
+  image: node:22-alpine
+  before_script:
+    - cd traza-web && npm ci
+  script:
+    - npm run build
+  artifacts:
+    paths: [traza-web/dist]
+    expire_in: 1 week
+
+# El APK necesita el SDK de Android, que son cientos de MB. Solo en `main`,
+# donde el coste se paga una vez por integración y no en cada rama.
+build:apk:
+  stage: build
+  image: androidsdk/android-35:latest
+  before_script:
+    - cd traza-handheld
+  script:
+    - ./gradlew :app:assembleDebug --no-daemon
+  artifacts:
+    paths: [traza-handheld/app/build/outputs/apk/debug/app-debug.apk]
+    expire_in: 1 month
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'

@@ -61,7 +61,7 @@ final class InventoryCycleService
      * fila por prenda, acumulando el conteo y quedándose con el RSSI máximo.
      *
      * @param  list<array<string, mixed>>  $scans
-     * @return int  filas afectadas
+     * @return int filas afectadas
      */
     public function registerScans(InventoryCycle $cycle, array $scans, ?int $deviceId = null): int
     {

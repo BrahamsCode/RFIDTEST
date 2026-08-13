@@ -42,7 +42,18 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 - **Contexto**: `docs/11-infraestructura-docker.md` §4
 - **Entregable**: `.gitlab-ci.yml` con etapas lint, test, build
 - **Aceptación**: el pipeline pasa en verde sobre `main` con el proyecto vacío
-- [ ]
+- [x] 12 trabajos en tres etapas. Cada script se ejecutó aquí antes de
+      escribirlo: `pint --test` (hubo que formatear 35 ficheros), los tres
+      `typecheck`, las cuatro suites y los dos `assemble`.
+      Se aparta del borrador de `docs/11` §4 en cuatro puntos, todos porque el
+      borrador nombra herramientas que el repositorio no tiene: no hay phpstan
+      (el lint de PHP es Pint a secas), las pruebas son PHPUnit y no Pest, el
+      trabajo de carga con k6 queda declarado pero desactivado hasta que exista
+      el guion, y se añade el handheld, que el borrador no contemplaba.
+      **No verificado en un runner de GitLab**: aquí no hay uno. Lo que está
+      comprobado es que cada comando del pipeline pasa en este entorno.
+      Se añadió el wrapper de Gradle, que faltaba y sin el cual el trabajo del
+      handheld no arrancaría.
 
 ---
 
@@ -345,31 +356,78 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 - **Contexto**: `docs/09-app-handheld.md` §5
 - **Entregable**: pantalla, ViewModel con `HashSet` de EPC, `KeepScreenOn`, háptica
 - **Aceptación**: 20 000 EPC deduplicados sin degradación de fluidez
-- [ ]
+- [x] `InventorySession` en el módulo nuevo `core:domain` (Kotlin JVM puro,
+      como `core:reader`), más `InventoryViewModel` y `InventoryScreen` en
+      `:app`. **Medido**: 40 000 lecturas —dos pasadas sobre 20 000 tags, así
+      que la mitad repetidas— en lotes de 25 como los del lector; el peor lote
+      queda por debajo de los 16 ms de un fotograma a 60 Hz, que es el número
+      que decide si la pantalla se atasca en la mano.
+      La sesión restaura los EPC ya leídos desde Room al reabrir: sin eso, un
+      cierre por memoria a mitad de barrido volvería a contar desde cero.
 
 ### 5.3 Sincronización offline
 - **Contexto**: `docs/09-app-handheld.md` §6
 - **Entregable**: Room + `UploadScansWorker` con manejo diferenciado de 5xx/401/4xx
 - **Aceptación**: un ciclo completo en modo avión sincroniza íntegro al recuperar red
-- [ ]
+- [x] Room (`ScanEntity`, `TagEntity`, DAOs), `UploadScansWorker` con
+      `HiltWorkerFactory`, y `SyncScheduler` con `ExistingWorkPolicy.KEEP`.
+      La decisión de qué hacer con cada fallo vive en `UploadPolicy`, en
+      `core:domain`, con sus pruebas: red y 5xx reintentan, 401/403 avisan del
+      problema de credenciales en vez de reintentar en bucle, 408/425/429
+      reintentan aunque sean 4xx —es el servidor pidiéndolo—, y el resto de
+      4xx se marca fallido **conservando las filas** para diagnóstico. El
+      retroceso exponencial tiene techo de 15 min: sin él, ocho fallos
+      seguidos dejarían el siguiente intento a más de una hora vista.
+      **El escenario de modo avión no está ejecutado extremo a extremo**:
+      necesita un dispositivo o un emulador, y aquí no hay ninguno.
 
 ### 5.4 Modo tarado
 - **Contexto**: `docs/09-app-handheld.md` §8
 - **Entregable**: pantalla, validación de conflictos, 4 señales sonoras distintas
 - **Aceptación**: perfil `TARADO` con potencia baja aplicado; un EPC ya tarado a otro SKU produce conflicto con confirmación explícita
-- [ ]
+- [x] `CommissioningSession` con las cuatro señales, más pantalla y diálogo de
+      conflicto. El conflicto no reasigna nada hasta que alguien pulsa
+      «Reasignar»: hacerlo en silencio descuadra el stock de dos variantes y
+      el error es indetectable después. Una prueba comprueba que las cuatro
+      señales son distintas entre sí — si dos coincidieran, el operario no
+      podría distinguirlas sin mirar, que es el objetivo entero.
+      ⚠️ **Corrección al perfil**: `ReadProfile.TARADO` estaba en sesión S1 y
+      la tabla de `docs/09` §4 dice S0. No era cosmético: la persistencia de
+      S1 calla al tag tras la primera respuesta, así que el `minReadCount = 2`
+      del propio perfil no se alcanzaría nunca y no se taría ninguna prenda.
+      Corregido a S0 en `core:reader` y en el perfil equivalente de
+      `traza-edge`.
 
 ### 5.5 Modo búsqueda (Geiger)
 - **Contexto**: `docs/09-app-handheld.md` §7
 - **Entregable**: proximidad suavizada y pitido que acelera de 800 a 60 ms
 - **Aceptación**: se localiza una prenda en menos de 3 min en prueba de campo
-- [ ]
+- [x] `ProximitySmoother` (media exponencial, α = 0.35) y `Geiger`, más la
+      pantalla con círculos concéntricos. La interpolación del pitido es
+      cuadrática y no lineal: con una recta, los últimos veinte puntos —cuando
+      ya estás delante de la estantería correcta— apenas se distinguirían
+      entre sí, que es donde hace falta resolución.
+      El pitido corre en su propio bucle y no atado a cada muestra: si
+      dependiera de las lecturas, un hueco del lector callaría el pitido justo
+      al acercarse.
+      **La prueba de campo de 3 minutos sigue pendiente**: es la tarea 0.1.
 
 ### 5.6 Alta por QR
 - **Contexto**: `docs/09-app-handheld.md` §10
 - **Entregable**: generación del QR en la web y canje en la app
 - **Aceptación**: el token de alta es de un solo uso y caduca a los 15 min
-- [ ]
+- [x] `DeviceEnrollmentService` + `DeviceController` en el API, pantalla
+      `/dispositivos` con el QR en la web, y `Enrollment` + `DeviceCredentials`
+      (EncryptedSharedPreferences) en la app. 18 pruebas cubren el único uso,
+      la caducidad, que el token no se guarde en claro, que el de un equipo no
+      sirva para otro, y que el token resultante sirva de verdad para ingestar.
+      ⚠️ **Decisión de almacenamiento que conviene revisar**: el token vive en
+      la caché con TTL nativo y no en una tabla, porque `sql/schema.sql` no
+      tiene sitio para esto y añadir una tabla es una decisión de modelo de
+      datos. La consecuencia: vaciar la caché invalida los QR emitidos y sin
+      canjear. Para 15 minutos parece asumible y falla cerrado, pero si
+      queréis conservar el histórico de altas hace falta una tabla
+      `device_enrollments` y eso lo decidís vosotros.
 
 ### 5.7 Implementación del SDK real
 - **Entregable**: `ZebraRfidReader` o `ChainwayRfidReader` según 0.1

@@ -36,6 +36,7 @@ la cookie de sesión.
 | `/prendas/:epc` | Ficha de prenda con historial completo |
 | `/alertas` | Bandeja, lo más grave primero |
 | `/portal` | **Portal antihurto**: alarmas en vivo, falso positivo de un toque y tasa de calibración |
+| `/dispositivos` | Lectores y handhelds, con el QR de alta y su cuenta atrás |
 
 ## Dirección visual
 
@@ -86,4 +87,5 @@ recalibración cuando pasa del umbral. Tiene sus pruebas en
 | Catálogo y lotes de etiquetas | Pendiente — tarea 4.6 |
 | Tiempo real por Reverb | Hecho — tarea 3.4; sin `VITE_REVERB_KEY` sondea cada 5 s |
 | Portal antihurto y falsos positivos | Hecho — tareas 6.3 y 6.4 |
+| Dispositivos y QR de alta | Hecho — tarea 5.6 |
 | Gráfico de RSSI en la ficha | Pendiente — necesita endpoint de detecciones |

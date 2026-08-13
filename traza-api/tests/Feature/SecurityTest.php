@@ -58,9 +58,9 @@ final class SecurityTest extends TestCase
                        inventory_cycle_expected, inventory_cycles,
                        stock_movements, tags, users RESTART IDENTITY CASCADE');
 
-        (new RoleSeeder())->run();
+        (new RoleSeeder)->run();
 
-        $this->movements = new StockMovementService(new TagStateMachine());
+        $this->movements = new StockMovementService(new TagStateMachine);
 
         $suffix = uniqid();
         $this->organization = Organization::create(['name' => 'VivaTech Pruebas']);
@@ -107,7 +107,7 @@ final class SecurityTest extends TestCase
     public function test_permiso_de_ajuste_de_stock_por_rol(RoleCode $role, bool $allowed): void
     {
         $user = $this->userWith($role);
-        $policy = new StockAdjustmentPolicy();
+        $policy = new StockAdjustmentPolicy;
 
         $this->assertSame(
             $allowed,
@@ -174,7 +174,7 @@ final class SecurityTest extends TestCase
 
     public function test_un_ajuste_de_mas_de_20_unidades_exige_supervisor_regional(): void
     {
-        $policy = new StockAdjustmentPolicy();
+        $policy = new StockAdjustmentPolicy;
         $jefe = $this->userWith(RoleCode::JefeTienda);
         $supervisor = $this->userWith(RoleCode::SupervisorRegional);
 
@@ -189,7 +189,7 @@ final class SecurityTest extends TestCase
 
     public function test_una_merma_de_mas_de_2000_soles_exige_supervisor_regional(): void
     {
-        $policy = new StockAdjustmentPolicy();
+        $policy = new StockAdjustmentPolicy;
         $jefe = $this->userWith(RoleCode::JefeTienda);
 
         $this->assertTrue($policy->apply($jefe, MovementType::Merma, value: 2000.0)->allowed());
@@ -198,7 +198,7 @@ final class SecurityTest extends TestCase
 
     public function test_anular_un_lote_tarado_solo_lo_hace_un_admin(): void
     {
-        $policy = new StockAdjustmentPolicy();
+        $policy = new StockAdjustmentPolicy;
 
         $this->assertTrue($policy->voidTagBatch($this->userWith(RoleCode::Admin))->allowed());
         $this->assertTrue($policy->voidTagBatch($this->userWith(RoleCode::SupervisorRegional))->denied());
@@ -206,7 +206,7 @@ final class SecurityTest extends TestCase
 
     public function test_cambiar_la_mascara_epc_exige_admin_y_motivo_escrito(): void
     {
-        $policy = new StockAdjustmentPolicy();
+        $policy = new StockAdjustmentPolicy;
         $admin = $this->userWith(RoleCode::Admin);
 
         $this->assertTrue($policy->changeEpcMask($admin, 'Migración a nuevo prefijo GS1')->allowed());
@@ -239,7 +239,7 @@ final class SecurityTest extends TestCase
 
         $this->assertStringContainsString(
             'justificación',
-            (new InventoryCyclePolicy())
+            (new InventoryCyclePolicy)
                 ->close($this->userWith(RoleCode::JefeTienda, $this->tienda), $cycle)
                 ->message(),
         );
@@ -336,7 +336,7 @@ final class SecurityTest extends TestCase
     public function test_la_contrasena_se_deriva_y_es_estable(): void
     {
         config()->set('traza.epc.access_master_key', str_repeat('a1', 32));
-        $service = new TagAccessPasswordService();
+        $service = new TagAccessPasswordService;
 
         $epc = '3035D919080C0E403B9ACA2A';
 
@@ -347,7 +347,7 @@ final class SecurityTest extends TestCase
     public function test_conocer_una_contrasena_no_revela_otra(): void
     {
         config()->set('traza.epc.access_master_key', str_repeat('a1', 32));
-        $service = new TagAccessPasswordService();
+        $service = new TagAccessPasswordService;
 
         $this->assertNotSame(
             $service->for('3035D919080C0E403B9ACA2A'),
@@ -360,7 +360,7 @@ final class SecurityTest extends TestCase
         // Un kill password igual al de acceso, o el de fábrica, permite a
         // cualquiera desactivar la etiqueta de forma irreversible.
         config()->set('traza.epc.access_master_key', str_repeat('a1', 32));
-        $service = new TagAccessPasswordService();
+        $service = new TagAccessPasswordService;
 
         $epc = '3035D919080C0E403B9ACA2A';
         $this->assertNotSame($service->for($epc), $service->killPasswordFor($epc));
@@ -369,7 +369,7 @@ final class SecurityTest extends TestCase
 
     public function test_cambiar_la_clave_maestra_cambia_todas_las_contrasenas(): void
     {
-        $service = new TagAccessPasswordService();
+        $service = new TagAccessPasswordService;
         $epc = '3035D919080C0E403B9ACA2A';
 
         config()->set('traza.epc.access_master_key', str_repeat('a1', 32));
@@ -385,7 +385,7 @@ final class SecurityTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessageMatches('/TRAZA_TAG_ACCESS_MASTER_KEY/');
-        (new TagAccessPasswordService())->for('3035D919080C0E403B9ACA2A');
+        (new TagAccessPasswordService)->for('3035D919080C0E403B9ACA2A');
     }
 
     public function test_el_handheld_obtiene_la_contrasena_de_un_epc_suyo(): void
@@ -497,7 +497,7 @@ final class SecurityTest extends TestCase
             $tags[] = $this->stockedTag();
         }
 
-        $cycles = new InventoryCycleService();
+        $cycles = new InventoryCycleService;
         $cycle = $cycles->create($this->tienda, 'INV-SEC-'.uniqid());
 
         $cycles->registerScans($cycle, array_map(

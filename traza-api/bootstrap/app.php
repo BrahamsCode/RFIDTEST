@@ -1,10 +1,15 @@
 <?php
 
+use App\Http\Middleware\AuthenticateDevice;
+use App\Http\Middleware\EnsureIdempotency;
+use App\Http\Middleware\SecurityHeaders;
+use App\Http\Problem;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -20,11 +25,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // El borde y el handheld se autentican con token de dispositivo, no
         // con sesión de usuario.
         $middleware->alias([
-            'device' => \App\Http\Middleware\AuthenticateDevice::class,
-            'idempotency' => \App\Http\Middleware\EnsureIdempotency::class,
+            'device' => AuthenticateDevice::class,
+            'idempotency' => EnsureIdempotency::class,
         ]);
 
-        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
+        $middleware->append(SecurityHeaders::class);
 
         // Sanctum en modo SPA: la web se autentica con la cookie de sesión,
         // no con tokens. Solo aplica a los dominios de SANCTUM_STATEFUL_DOMAINS.
@@ -33,7 +38,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Límite de tasa: 300/min por usuario, 2000/min por dispositivo.
         // Ver AppServiceProvider::configureRateLimiting().
         $middleware->api(prepend: [
-            \Illuminate\Routing\Middleware\ThrottleRequests::class.':api',
+            ThrottleRequests::class.':api',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
@@ -45,7 +50,7 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             if ($e instanceof ValidationException) {
-                return \App\Http\Problem::make(
+                return Problem::make(
                     422,
                     'Los datos enviados no son válidos',
                     'Revise el campo "errors" para el detalle.',
@@ -55,7 +60,7 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             if ($e instanceof ModelNotFoundException || $e instanceof NotFoundHttpException) {
-                return \App\Http\Problem::make(404, 'No encontrado');
+                return Problem::make(404, 'No encontrado');
             }
 
             return null;

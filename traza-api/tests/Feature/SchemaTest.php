@@ -150,7 +150,7 @@ final class SchemaTest extends TestCase
         $cycleId = DB::scalar(
             'INSERT INTO inventory_cycles (organization_id, location_id, code)
              VALUES (?, ?, ?) RETURNING id',
-            [$orgId, $locationId, 'INV-' . uniqid()]
+            [$orgId, $locationId, 'INV-'.uniqid()]
         );
 
         DB::insert(

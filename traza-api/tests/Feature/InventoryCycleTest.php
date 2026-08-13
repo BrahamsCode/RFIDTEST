@@ -12,12 +12,12 @@ use App\Enums\CycleStatus;
 use App\Enums\MovementType;
 use App\Enums\TagState;
 use App\Models\Device;
-use App\Models\InventoryCycle;
 use App\Models\Location;
 use App\Models\Organization;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Tag;
+use App\Models\User;
 use App\Models\Zone;
 use App\Services\InventoryCycleService;
 use App\Services\StockMovementService;
@@ -57,8 +57,8 @@ final class InventoryCycleTest extends TestCase
                        inventory_cycle_expected, inventory_cycles,
                        stock_movements, tags RESTART IDENTITY CASCADE');
 
-        $this->movements = new StockMovementService(new TagStateMachine());
-        $this->cycles = new InventoryCycleService();
+        $this->movements = new StockMovementService(new TagStateMachine);
+        $this->cycles = new InventoryCycleService;
 
         $suffix = uniqid();
         $this->organization = Organization::create(['name' => 'VivaTech Pruebas']);
@@ -412,7 +412,7 @@ final class InventoryCycleTest extends TestCase
         $cycle = $this->cycles->create($this->location, 'INV-028');
         $this->reconciler()->reconcile($cycle);
 
-        $user = \App\Models\User::create([
+        $user = User::create([
             'organization_id' => $this->organization->id,
             'name' => 'Jefa de tienda',
             'email' => uniqid().'@vivatech-peru.com',

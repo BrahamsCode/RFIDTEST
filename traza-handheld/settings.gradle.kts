@@ -19,6 +19,10 @@ rootProject.name = "traza-handheld"
 // abstracción del lector se compila y se prueba sin SDK ni hardware.
 include(":core:reader")
 
+// core:domain guarda la lógica de los cinco modos, también sin Android: los
+// ViewModel de Compose se limitan a exponerla.
+include(":core:domain")
+
 // El módulo Android solo entra en la compilación si hay SDK. Sin esto, la
 // etapa de pruebas de CI no podría ejecutar core:reader.
 val androidSdk = System.getenv("ANDROID_HOME")

@@ -107,7 +107,8 @@ Un error ahí corrompe identificadores de forma silenciosa e irreversible.
 | Difusión en tiempo real por Reverb | Hecho — tarea 3.4 |
 | Portal antihurto: tránsitos, gracia y falsos positivos | Hecho — épica 6 |
 | `traza:listen-portal` (suscriptor MQTT) | Hecho — tarea 6.2 |
-| Catálogo, dispositivos, lotes de etiquetas | Pendiente |
+| Dispositivos y alta por QR | Hecho — tarea 5.6 |
+| Catálogo y lotes de etiquetas | Pendiente |
 
 ## Endpoints
 
@@ -121,6 +122,12 @@ Superficie de `docs/06` §6. `php artisan route:list --path=api/v1` da la lista 
 | `POST /api/v1/ingest/heartbeat` | Latido del borde |
 | `POST /api/v1/inventory-cycles/{id}/scans` | Escaneos del handheld, deduplicados por EPC |
 | `POST /api/v1/ingest/portal-event` | Tránsito de portal; respaldo del camino MQTT |
+
+**Sin credenciales** (la única del API):
+
+| Ruta | Qué hace |
+|---|---|
+| `POST /api/v1/devices/enroll` | Canje del QR de alta. Token de un solo uso, 15 min, 10 intentos/min |
 
 **Sesión de usuario** (Sanctum): tags y su historial, ciclos de inventario
 (crear, arrancar, pausar, cerrar, informe, avance por zona), movimientos y

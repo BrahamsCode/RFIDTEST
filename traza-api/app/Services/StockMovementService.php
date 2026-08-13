@@ -127,7 +127,7 @@ final class StockMovementService
      * transferencias y cierre de ciclo, donde N puede ser de miles.
      *
      * @param  list<int>  $tagIds
-     * @return int  número de movimientos aplicados
+     * @return int número de movimientos aplicados
      */
     public function applyBulk(array $tagIds, MovementIntent $template): int
     {

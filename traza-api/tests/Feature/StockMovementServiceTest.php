@@ -47,7 +47,7 @@ final class StockMovementServiceTest extends TestCase
             $this->markTestSkipped('Requiere PostgreSQL.');
         }
 
-        $this->service = new StockMovementService(new TagStateMachine());
+        $this->service = new StockMovementService(new TagStateMachine);
         $suffix = uniqid();
 
         $this->organization = Organization::create(['name' => 'VivaTech Pruebas']);
@@ -348,7 +348,7 @@ final class StockMovementServiceTest extends TestCase
 
         $destino = Location::create([
             'organization_id' => $this->organization->id,
-            'code' => 'T-' . uniqid(),
+            'code' => 'T-'.uniqid(),
             'name' => 'Gamarra 2',
         ]);
 

@@ -52,7 +52,7 @@ final class AnalyticViewsTest extends TestCase
                        inventory_cycle_expected, inventory_cycles,
                        stock_movements, tags RESTART IDENTITY CASCADE');
 
-        $this->movements = new StockMovementService(new TagStateMachine());
+        $this->movements = new StockMovementService(new TagStateMachine);
 
         $suffix = uniqid();
         $this->organization = Organization::create(['name' => 'VivaTech Pruebas']);
@@ -151,7 +151,7 @@ final class AnalyticViewsTest extends TestCase
     public function test_la_exactitud_solo_incluye_ciclos_cerrados(): void
     {
         $tags = $this->stockTags(4, $this->sala);
-        $cycles = new InventoryCycleService();
+        $cycles = new InventoryCycleService;
 
         $cycle = $cycles->create($this->tienda, 'INV-VIS-01');
         $cycles->registerScans($cycle, [
@@ -272,7 +272,7 @@ final class AnalyticViewsTest extends TestCase
         $enSala = $this->stockTags(2, $this->sala);
         $this->stockTags(2, $this->trastienda);
 
-        $cycles = new InventoryCycleService();
+        $cycles = new InventoryCycleService;
         $cycle = $cycles->create($this->tienda, 'INV-VIS-02');
         $cycles->registerScans($cycle, array_map(
             fn (Tag $t) => ['epc' => $t->epc], $enSala

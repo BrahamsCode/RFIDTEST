@@ -7,7 +7,6 @@ namespace Tests\Unit;
 use App\Domain\Tagging\TagStateMachine;
 use App\Enums\MovementType;
 use App\Enums\TagState;
-use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -17,7 +16,7 @@ final class TagStateMachineTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->machine = new TagStateMachine();
+        $this->machine = new TagStateMachine;
     }
 
     /**

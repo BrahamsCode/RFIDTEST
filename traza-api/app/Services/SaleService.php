@@ -11,6 +11,7 @@ use App\Models\Location;
 use App\Models\SaleLine;
 use App\Models\SaleTransaction;
 use App\Models\Tag;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -45,7 +46,7 @@ final class SaleService
             fn (Tag $t) => in_array($t->state, [TagState::EnStock, TagState::NoVisto], strict: true)
         );
 
-        return DB::transaction(function () use ($location, $code, $epcs, $userId, $externalRef, $tags, $sellable): array {
+        return DB::transaction(function () use ($location, $code, $epcs, $userId, $externalRef, $sellable): array {
             $sale = SaleTransaction::create([
                 'organization_id' => $location->organization_id,
                 'location_id' => $location->id,
@@ -193,9 +194,9 @@ final class SaleService
 
     /**
      * @param  list<string>  $epcs
-     * @return \Illuminate\Support\Collection<int, Tag>
+     * @return Collection<int, Tag>
      */
-    private function resolve(int $organizationId, array $epcs): \Illuminate\Support\Collection
+    private function resolve(int $organizationId, array $epcs): Collection
     {
         return Tag::query()
             ->with('productVariant')

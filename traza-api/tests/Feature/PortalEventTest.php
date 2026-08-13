@@ -63,10 +63,10 @@ final class PortalEventTest extends TestCase
         DB::statement('TRUNCATE portal_events, alerts, sale_lines, sale_transactions,
                        role_user, roles, stock_movements, tags, users
                        RESTART IDENTITY CASCADE');
-        (new RoleSeeder())->run();
+        (new RoleSeeder)->run();
 
         $this->service = app(PortalEventService::class);
-        $this->movements = new StockMovementService(new TagStateMachine());
+        $this->movements = new StockMovementService(new TagStateMachine);
 
         $suffix = uniqid();
         $this->organization = Organization::create(['name' => 'VivaTech Pruebas']);
@@ -469,7 +469,7 @@ final class PortalEventTest extends TestCase
         // propio bloque catch sin que nadie lo note.
         $tag = $this->stockTag();
 
-        (new ListenPortalEvents())->dispatchMessage(
+        (new ListenPortalEvents)->dispatchMessage(
             $this->service,
             "traza/{$this->tienda->code}/portal",
             json_encode([

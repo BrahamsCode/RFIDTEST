@@ -222,7 +222,7 @@ final class ListenPortalEvents extends Command
         $username = config('mqtt.username') ?: null;
         $password = config('mqtt.password') ?: null;
 
-        $settings = (new ConnectionSettings())
+        $settings = (new ConnectionSettings)
             ->setUsername($username)
             ->setPassword($password)
             ->setKeepAliveInterval(30)
