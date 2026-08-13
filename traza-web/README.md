@@ -11,14 +11,30 @@ cp .env.example .env
 npm run dev
 ```
 
+La API tiene que estar corriendo y con `SANCTUM_STATEFUL_DOMAINS` incluyendo
+el dominio de la web (por defecto `localhost:5173`), o el navegador rechazará
+la cookie de sesión.
+
 ## Comandos
 
 | Comando | Qué hace |
 |---|---|
 | `npm run dev` | Servidor de desarrollo en :5173 |
 | `npm run build` | Compila a `dist/` |
-| `npm run typecheck` | Comprobación de tipos |
+| `npm run lint` | Comprobación de tipos |
 | `npm test` | Pruebas con Vitest |
+
+## Pantallas
+
+| Ruta | Qué muestra |
+|---|---|
+| `/` | Panel de tienda: cuatro números grandes y antigüedad del stock |
+| `/inventario` | Listado de ciclos |
+| `/inventario/:id` | **Ciclo en vivo**: progreso, avance por zona y aviso de zona lenta |
+| `/stock` | Existencias por SKU y zona, valorización y reposición |
+| `/prendas` | Buscador con tabla virtualizada |
+| `/prendas/:epc` | Ficha de prenda con historial completo |
+| `/alertas` | Bandeja, lo más grave primero |
 
 ## Dirección visual
 
@@ -28,22 +44,34 @@ tienda con mucha luz. Eso manda sobre cualquier consideración estética:
 1. Densidad alta pero legible: un jefe de tienda quiere 40 filas, no 8 tarjetas.
 2. El estado se lee de un vistazo. El color nunca es decorativo.
 3. Los números son el contenido: tipografía tabular en todo lo numérico.
-4. Sin animación gratuita.
+4. Sin animación gratuita. La única con valor es la barra de progreso del
+   ciclo, porque comunica que el sistema sigue vivo mientras alguien barre la
+   tienda durante media hora.
 
 El estado de una prenda se codifica con **color y forma** (`TAG_STATE_UI` en
 `src/lib/tagState.ts`), nunca solo color: hay operarios con daltonismo.
 
-`src/lib/domain.ts` refleja los ENUM de `sql/schema.sql`. Si cambia el esquema,
-hay que actualizarlo — la prueba de `tagState.test.ts` detecta el desajuste.
+`src/lib/domain.ts` refleja los ENUM de `sql/schema.sql`. Si cambia el
+esquema, hay que actualizarlo — la prueba de `tagState.test.ts` detecta el
+desajuste.
+
+## El aviso de zona lenta
+
+Es la función con más valor operativo de la aplicación: detecta que alguien no
+barrió una zona **mientras aún puede volver**, en lugar de descubrirlo en el
+informe final, cuando ya se ha generado merma falsa. Tiene sus propias
+pruebas en `src/pages/inventory/CycleLive.test.tsx`.
 
 ## Estado de implementación
 
 | Pieza | Estado |
 |---|---|
-| Proyecto, Tailwind y Dockerfile | Hecho |
-| Cliente de API con interceptores | Hecho |
-| `TAG_STATE_UI` y tipos de dominio | Hecho |
-| Pantalla de salud del sistema | Hecho |
-| Autenticación con Sanctum | Pendiente — tarea 4.1 |
-| Ciclo de inventario en vivo | Pendiente — tarea 4.2 |
-| Tabla virtualizada de tags | Pendiente — tarea 4.5 |
+| Base, sesión, enrutado y primitivas | Hecho — tarea 4.1 |
+| Ciclo en vivo con aviso de zona lenta | Hecho — tarea 4.2 |
+| Stock, valorización y reposición | Hecho — tarea 4.3 |
+| Ficha de prenda con historial | Hecho — tarea 4.4 |
+| Tabla virtualizada | Hecho — tarea 4.5 |
+| Panel de tienda | Hecho — tarea 4.7 |
+| Catálogo y lotes de etiquetas | Pendiente — tarea 4.6 |
+| Tiempo real por Reverb | Pendiente — tarea 3.4; mientras tanto sondea cada 5 s |
+| Gráfico de RSSI en la ficha | Pendiente — necesita endpoint de detecciones |

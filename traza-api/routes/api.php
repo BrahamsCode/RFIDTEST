@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\InventoryCycleController;
 use App\Http\Controllers\Api\V1\MovementController;
 use App\Http\Controllers\Api\V1\ReceivingOrderController;
 use App\Http\Controllers\Api\V1\SaleController;
+use App\Http\Controllers\Api\V1\StockController;
 use App\Http\Controllers\Api\V1\TagAccessController;
 use App\Http\Controllers\Api\V1\TagController;
 use Illuminate\Http\Request;
@@ -60,6 +61,13 @@ Route::prefix('v1')->group(function (): void {
         Route::get('movements', [MovementController::class, 'index'])->name('api.v1.movements.index');
         Route::get('receiving-orders', [ReceivingOrderController::class, 'index'])->name('api.v1.receiving.index');
         Route::get('receiving-orders/{receivingOrder}', [ReceivingOrderController::class, 'show'])->name('api.v1.receiving.show');
+
+        // Stock, sobre las vistas analíticas
+        Route::get('stock', [StockController::class, 'index'])->name('api.v1.stock.index');
+        Route::get('stock/summary', [StockController::class, 'summary'])->name('api.v1.stock.summary');
+        Route::get('stock/valuation', [StockController::class, 'valuation'])->name('api.v1.stock.valuation');
+        Route::get('stock/aging', [StockController::class, 'aging'])->name('api.v1.stock.aging');
+        Route::get('stock/replenishment', [StockController::class, 'replenishment'])->name('api.v1.stock.replenishment');
 
         // Alertas
         Route::get('alerts', [AlertController::class, 'index'])->name('api.v1.alerts.index');

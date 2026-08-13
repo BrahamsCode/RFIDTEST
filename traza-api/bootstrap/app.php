@@ -25,6 +25,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
 
+        // Sanctum en modo SPA: la web se autentica con la cookie de sesión,
+        // no con tokens. Solo aplica a los dominios de SANCTUM_STATEFUL_DOMAINS.
+        $middleware->statefulApi();
+
         // Límite de tasa: 300/min por usuario, 2000/min por dispositivo.
         // Ver AppServiceProvider::configureRateLimiting().
         $middleware->api(prepend: [

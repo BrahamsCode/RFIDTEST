@@ -101,9 +101,11 @@ Un error ahí corrompe identificadores de forma silenciosa e irreversible.
 | Vistas y funciones analíticas | Hecho — tarea 8.1 |
 | Codecs SGTIN-96 y GID-96 con su factoría | Hecho — tarea 1.2 |
 | Reserva concurrente de seriales | Hecho — tarea 1.5 |
-| Catálogo, stock, dispositivos, lotes de etiquetas | Pendiente — endpoints; las vistas ya están |
-| Codec SGTIN-96 (requiere GMP) | Pendiente — tarea 1.2, bloqueada por la 0.2 |
-| Reserva de seriales (envoltorio PHP) | Pendiente — tarea 1.5 |
+| Endpoints de stock sobre las vistas | Hecho — base de la épica 4 |
+| Acceso web con sesión (Sanctum SPA) | Hecho |
+| Mensajes de validación en español | Hecho — `lang/es/validation.php` |
+| Catálogo, dispositivos, lotes de etiquetas | Pendiente |
+| Difusión en tiempo real por Reverb | Pendiente — tarea 3.4 |
 
 ## Endpoints
 

@@ -260,30 +260,51 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 - **Contexto**: `docs/08-frontend-react.md` §1, §2, §10
 - **Entregable**: Vite + React + TS + Tailwind + TanStack Query + Router, cliente de API con interceptores, primitivas de UI
 - **Aceptación**: autenticación con Sanctum funcionando; `TAG_STATE_UI` aplicado
-- [ ]
+- [x] Enrutado, sesión, layout y primitivas. Login verificado de extremo a
+  extremo contra la API real.
+- **Faltaba en el backend**: `install:api` no crea rutas de sesión, así que
+  `/login` devolvía 404 y la web no podía autenticarse. Se añaden
+  `AuthController`, `statefulApi()`, `config/cors.php` y
+  `SANCTUM_STATEFUL_DOMAINS`.
 
 ### 4.2 Ciclo de inventario en vivo
 - **Contexto**: `docs/08-frontend-react.md` §4
 - **Entregable**: pantalla con progreso, desglose por zona, `SlowZoneHint`, hook `useCycleProgress`
 - **Aceptación**: con el simulador corriendo, la pantalla avanza en tiempo real y avisa de la zona lenta
-- [ ]
+- [~] Progreso, desglose por zona y `SlowZoneHint`, con 5 pruebas. Verificado
+  con datos reales: con la sala al 95 % y la trastienda al 0 %, el aviso
+  nombra la trastienda.
+- **En vez de `useCycleProgress` sobre Reverb, sondea cada 5 s.** La difusión
+  por WebSocket es la tarea 3.4 y no está hecha; sin sondeo la pantalla
+  habría que recargarla a mano, que es peor. Cambiarlo luego es sustituir el
+  `refetchInterval` por el hook.
 
 ### 4.3 Stock y reposición
 - **Entregable**: listados de stock, valorización, antigüedad y reposición sobre las vistas SQL
 - **Aceptación**: p95 < 200 ms con 50 000 tags en la base
-- [ ]
+- [~] Pantalla y endpoints (`/stock`, `/valuation`, `/aging`,
+  `/replenishment`, `/summary`) sobre las vistas de la tarea 8.1, con 7
+  pruebas.
+- **Falta la medición de p95 con 50 000 tags.**
 
 ### 4.4 Ficha de prenda
 - **Contexto**: `docs/08-frontend-react.md` §5
 - **Entregable**: ficha con estado, ubicación, historial completo y gráfico de RSSI
 - **Aceptación**: el historial coincide exactamente con `stock_movements`
-- [ ]
+- [~] Ficha con estado, ubicación, datos de la venta e historial completo.
+  El endpoint ya tenía prueba de que el historial cuadra con
+  `stock_movements`.
+- **Falta el gráfico de RSSI**, que necesita un endpoint de detecciones
+  recientes sobre `tag_reads`.
 
 ### 4.5 Tabla virtualizada de tags
 - **Contexto**: `docs/08-frontend-react.md` §6
 - **Entregable**: `TagTable` con `useVirtualizer` + `useInfiniteQuery`
 - **Aceptación**: 20 000 filas se desplazan a 60 fps
-- [ ]
+- [~] `TagTable` con `useVirtualizer` y `useInfiniteQuery`, cargando la
+  página siguiente al acercarse al final.
+- **Falta medir los 60 fps con 20 000 filas**: exige un navegador real, no
+  jsdom.
 
 ### 4.6 Catálogo y lotes de etiquetas
 - **Entregable**: CRUD de productos y variantes; generación de lotes con reserva de seriales y descarga de ZPL
@@ -294,7 +315,10 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 - **Contexto**: `docs/13-kpis-y-analitica.md` §3.1
 - **Entregable**: pantalla de 4 números grandes legible a 3 m
 - **Aceptación**: revisada en la tienda con el equipo real
-- [ ]
+- [~] Los cuatro números (stock, exactitud, alertas abiertas, reposición) más
+  la antigüedad por tramos.
+- **La revisión en tienda con el equipo real es presencial**, no se puede
+  cerrar desde aquí.
 
 ---
 
