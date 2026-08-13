@@ -385,24 +385,51 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 - **Contexto**: `docs/07-middleware-rfid.md` §4 (`DirectionStage`)
 - **Entregable**: heurística de centroide temporal ponderado por RSSI
 - **Aceptación**: escenario `portal_salida` → `salida` con confianza ≥ 0.7; `portal_dudoso` → sin evento
-- [ ]
+- [x] `DirectionStage` con tres correcciones sobre el borrador de `docs/07` §4
+      (la confianza ya usa el desequilibrio de potencia, la separación se mide
+      contra la duración del rastro en vez de contra 800 ms fijos, y el rastro
+      deja de borrarse cuando la clasificación no concluye). Los escenarios
+      `portal_salida` y `portal_dudoso` del simulador pasaron a guionizar el
+      tránsito por tag con RSSI determinista: antes la antena se elegía con un
+      contador global y el escenario dudoso emitía salidas. 9 pruebas nuevas en
+      `traza-edge/test/portal.test.ts`.
 
 ### 6.2 Camino rápido por MQTT
 - **Contexto**: `docs/07-middleware-rfid.md` §6
 - **Entregable**: publicación MQTT desde el borde + comando `traza:listen-portal`
 - **Aceptación**: latencia extremo a extremo p99 < 800 ms
-- [ ]
+- [x] `PortalPublisher` en el borde (tópico `traza/{tienda}/portal`, QoS 1, con
+      respaldo HTTP a `POST /api/v1/ingest/portal-event` si no hay broker) y
+      `traza:listen-portal` en Laravel, con reconexión indefinida, tolerancia a
+      mensajes malformados y señal de vida para el healthcheck. Métricas
+      `traza_edge_portal_events_total` en `/metrics`.
+      **Medido con broker real** (Mosquitto 2.0.18 en el mismo host, 40
+      tránsitos): p50 103 ms, p99 **110 ms** desde la publicación hasta la fila
+      en PostgreSQL, y eso incluye los ~90 ms de arrancar `mosquitto_pub` en
+      cada muestra, así que es una cota superior generosa. El tramo interno del
+      servicio, medido aparte en PHPUnit, queda en p99 < 200 ms.
+      Lo que **falta por medir** es el salto lector → borde, que necesita
+      hardware (tarea 0.1); quedan unos 690 ms de presupuesto para ese tramo.
 
 ### 6.3 Período de gracia y alertas
 - **Entregable**: verificación de venta reciente y alerta `salida_no_vendida`
 - **Aceptación**: venta seguida de cruce dentro de 120 s → sin alarma; sin venta → alerta
-- [ ]
+- [x] `PortalEventService` con las cinco condiciones de silencio de P09: solo
+      salidas, confianza por encima del umbral, EPC propio, sin venta reciente y
+      tag no vendido. La ventana de 120 s y el estado `vendido` son
+      comprobaciones distintas a propósito: la primera cubre las ventas que
+      llegan de un POS externo, que no tocan el ciclo de vida del tag.
 
 ### 6.4 Registro de falsos positivos
 - **Contexto**: `docs/10-procesos-operativos.md` P09
 - **Entregable**: acción de un toque para marcar una alarma como falso positivo
 - **Aceptación**: el indicador de `docs/13` §2 se calcula con esos datos
-- [ ]
+- [x] `POST /api/v1/portal-events/{id}/false-positive` y la pantalla `/portal`,
+      con el botón sin diálogo de confirmación ni nota obligatoria: si costara
+      más de un toque nadie lo registraría. `GET /portal-events/stats` calcula
+      descartadas / totales y avisa al pasar del 20 %. La acción la puede hacer
+      cualquiera con `alert.view`, también deliberadamente; el riesgo de que
+      alguien descarte su propia alarma se cubre con auditoría, no con permisos.
 
 ---
 

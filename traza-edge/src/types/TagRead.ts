@@ -14,6 +14,17 @@ export interface RawTagRead {
 
 export type Direction = 'entrada' | 'salida' | 'indeterminado';
 
+/**
+ * Rastro que justifica la clasificación de dirección. Se conserva aunque no
+ * haya alarma: la heurística falla en trazas ambiguas y sin la secuencia de
+ * antenas no hay forma de revisar una alarma discutida.
+ */
+export interface TransitEvidence {
+  samples: ReadonlyArray<{ t: number; side: AntennaSide; rssi: number; port: number }>;
+  /** Separación entre centroides temporales, en ms. Positivo = interior primero. */
+  deltaMs: number;
+}
+
 /** Lectura tras superar el pipeline. Lista para enviar. */
 export interface ProcessedTagRead extends RawTagRead {
   sessionRef: string;
@@ -21,6 +32,7 @@ export interface ProcessedTagRead extends RawTagRead {
   zoneId?: number;
   direction?: Direction;
   confidence?: number;
+  evidence?: TransitEvidence;
 }
 
 export interface ReadProfile {

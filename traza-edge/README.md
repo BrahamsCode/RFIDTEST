@@ -41,6 +41,22 @@ Se elige con `SIMULATOR_SCENARIO`. Todos son reproducibles fijando
 | `red_caida` | Buffer y vaciado con retroceso |
 | `avalancha` | Contrapresión y límites de memoria |
 
+## Portal antihurto
+
+Con `PORTAL_ENABLED=true` el borde publica cada salida con confianza suficiente
+en `traza/{TRAZA_LOCATION_CODE}/portal` con QoS 1, sin pasar por el buffer: el
+presupuesto es de 800 ms extremo a extremo y una alarma que suena cuando la
+persona ya salió no sirve de nada. La lectura va igualmente al buffer para el
+registro histórico.
+
+Si no hay broker —o se cae— el publicador usa `POST /api/v1/ingest/portal-event`
+como respaldo. Es más lento y no se compromete al presupuesto, pero es eso o
+quedarse sin antihurto.
+
+```bash
+PORTAL_ENABLED=true SIMULATOR_SCENARIO=portal_salida npm run dev
+```
+
 ## Observabilidad
 
 - `GET :9100/health` — estado y profundidad del buffer
@@ -48,6 +64,11 @@ Se elige con `SIMULATOR_SCENARIO`. Todos son reproducibles fijando
 
 La métrica más útil es `traza_edge_reads_dropped_total{stage="epc_mask"}`. Si
 sube de golpe, o el vecino instaló RFID, o entró mercadería sin tarar.
+
+En un portal, la que importa es `traza_edge_portal_events_total`. Un
+`result="suppressed"` mucho mayor que `result="published"` significa que el
+arco ve pasar gente pero no se atreve a clasificar el cruce: toca revisar la
+colocación de las antenas antes que subir la potencia.
 
 ## Estado de implementación
 
@@ -60,5 +81,5 @@ sube de golpe, o el vecino instaló RFID, o entró mercadería sin tarar.
 | Latido y métricas | Hecho |
 | Apagado ordenado | Hecho |
 | `LlrpAdapter` / `HttpWebhookAdapter` | Pendiente — tarea 2.7, depende de la 0.1 |
-| Publicación MQTT del portal | Pendiente — tarea 6.2 |
+| Publicación MQTT del portal | Hecho — tarea 6.2 |
 | Impresión ZPL | Pendiente |

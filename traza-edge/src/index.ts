@@ -10,11 +10,38 @@ import { PROFILES, type ReaderAdapter } from './readers/ReaderAdapter.js';
 import { SqliteBuffer } from './buffer/SqliteBuffer.js';
 import { Flusher } from './buffer/Flusher.js';
 import { ApiClient } from './transport/ApiClient.js';
+import { PortalPublisher, type MqttLike } from './transport/PortalPublisher.js';
 import { Heartbeat } from './health/Heartbeat.js';
 import { startMetricsServer } from './health/metrics.js';
 import type { AntennaConfig, PipelineContext, ProcessedTagRead } from './types/TagRead.js';
+import type { Env } from './config/index.js';
 
 const VERSION = '0.1.0';
+
+/**
+ * El broker puede no estar levantado cuando arranca el borde. No es motivo
+ * para no arrancar: el publicador cae al respaldo HTTP y `mqtt.js` sigue
+ * reintentando por su cuenta.
+ */
+async function connectMqtt(env: Env): Promise<MqttLike | undefined> {
+  try {
+    const { connectAsync } = await import('mqtt');
+
+    return (await connectAsync(env.MQTT_URL, {
+      username: env.MQTT_USERNAME,
+      password: env.MQTT_PASSWORD,
+      clientId: `traza-edge-${env.TRAZA_DEVICE_CODE}`,
+      reconnectPeriod: 2000,
+      connectTimeout: 5000,
+    })) as unknown as MqttLike;
+  } catch (err) {
+    console.error(
+      `[portal] Sin broker MQTT (${err instanceof Error ? err.message : err}). ` +
+        'Se usará el respaldo HTTP, más lento.',
+    );
+    return undefined;
+  }
+}
 
 async function main(): Promise<void> {
   const env = config();
@@ -69,12 +96,33 @@ async function main(): Promise<void> {
   const api = new ApiClient(env.TRAZA_API_URL, env.TRAZA_DEVICE_TOKEN, env.TRAZA_DEVICE_CODE);
   const flusher = new Flusher(buffer, api, env.EDGE_FLUSH_BATCH);
 
+  // Camino rápido del portal: MQTT si hay broker, HTTP si no. Solo se
+  // conecta cuando el equipo es realmente un portal; en un handheld sería
+  // una conexión abierta para nada.
+  const mqtt = isPortal ? await connectMqtt(env) : undefined;
+  const portal = isPortal
+    ? new PortalPublisher({
+        locationCode: env.TRAZA_LOCATION_CODE,
+        deviceCode: env.TRAZA_DEVICE_CODE,
+        minConfidence: env.PORTAL_MIN_CONFIDENCE,
+        mqtt,
+        fallback: api,
+        onError: (err) => console.error('[portal]', err.message),
+      })
+    : undefined;
+
   let connected = false;
   const pending: ProcessedTagRead[] = [];
 
   reader.on('read', (raw) => {
     const processed = pipeline.run(raw, ctx);
-    if (processed) pending.push(processed);
+    if (!processed) return;
+
+    // Primero la alarma, después el registro: el orden importa porque el
+    // presupuesto son 800 ms y escribir en SQLite puede esperar.
+    if (portal?.shouldPublish(processed)) void portal.publish(processed);
+
+    pending.push(processed);
   });
   reader.on('error', (err) => console.error('[reader]', err.message));
   reader.on('disconnected', () => {
@@ -95,6 +143,7 @@ async function main(): Promise<void> {
     pipeline,
     buffer,
     readerConnected: () => connected,
+    portal,
   });
 
   await reader.connect();
@@ -133,6 +182,7 @@ async function main(): Promise<void> {
     const remaining = buffer.depth();
     metrics.close();
     buffer.close();
+    await (mqtt as { endAsync?: () => Promise<void> } | undefined)?.endAsync?.();
     console.log(`[edge] Cerrado. Pendientes en buffer: ${remaining}`);
     process.exit(0);
   };

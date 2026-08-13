@@ -4,6 +4,7 @@ import { Layout } from './components/Layout';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Alerts } from './pages/Alerts';
+import { Portal } from './pages/Portal';
 import { CycleList } from './pages/inventory/CycleList';
 import { CycleLive } from './pages/inventory/CycleLive';
 import { StockList } from './pages/stock/StockList';
@@ -35,6 +36,7 @@ export default function App() {
             <Route path="prendas" element={<TagList />} />
             <Route path="prendas/:epc" element={<TagDetail />} />
             <Route path="alertas" element={<Alerts />} />
+            <Route path="portal" element={<Portal />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -8,11 +8,13 @@ use App\Http\Middleware\AuthenticateDevice;
 use App\Models\Device;
 use App\Models\InventoryCycle;
 use App\Models\Organization;
+use App\Models\PortalEvent;
 use App\Models\ProductVariant;
 use App\Models\Tag;
 use App\Models\User;
 use App\Observers\AuditObserver;
 use App\Policies\InventoryCyclePolicy;
+use App\Policies\PortalEventPolicy;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
@@ -49,6 +51,7 @@ class AppServiceProvider extends ServiceProvider
         }
 
         Gate::policy(InventoryCycle::class, InventoryCyclePolicy::class);
+        Gate::policy(PortalEvent::class, PortalEventPolicy::class);
 
         $this->configureRateLimiting();
     }

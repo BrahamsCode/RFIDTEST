@@ -301,3 +301,44 @@ export const alerts = {
     });
   },
 };
+
+// --------------------------------------------------------------- portal
+
+export interface PortalEvent {
+  id: number;
+  location_id: number;
+  device_id: number;
+  tag_id: number | null;
+  epc: string;
+  direction: 'salida' | 'entrada' | 'indeterminado' | null;
+  confidence: number | null;
+  was_sold: boolean | null;
+  alarm_raised: boolean;
+  occurred_at: string;
+}
+
+export interface PortalStats {
+  location_id: number;
+  days: number;
+  alarms: number;
+  dismissed: number;
+  rate: number;
+  threshold: number;
+  needs_recalibration: boolean;
+}
+
+export const portal = {
+  async list(params: Record<string, unknown> = {}): Promise<Paginated<PortalEvent>> {
+    const { data } = await api.get('/api/v1/portal-events', { params });
+    return data;
+  },
+  async stats(locationId: number, days = 30): Promise<PortalStats> {
+    const { data } = await api.get('/api/v1/portal-events/stats', {
+      params: { location: locationId, days },
+    });
+    return data;
+  },
+  async markFalsePositive(id: number, note?: string): Promise<void> {
+    await api.post(`/api/v1/portal-events/${id}/false-positive`, { note });
+  },
+};

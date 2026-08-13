@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\IngestController;
 use App\Http\Controllers\Api\V1\InventoryCycleController;
 use App\Http\Controllers\Api\V1\MovementController;
+use App\Http\Controllers\Api\V1\PortalEventController;
 use App\Http\Controllers\Api\V1\ReceivingOrderController;
 use App\Http\Controllers\Api\V1\SaleController;
 use App\Http\Controllers\Api\V1\StockController;
@@ -29,6 +30,12 @@ Route::prefix('v1')->group(function (): void {
         Route::prefix('ingest')->group(function (): void {
             Route::post('reads', [IngestController::class, 'store'])->name('api.v1.ingest.reads');
             Route::post('heartbeat', [IngestController::class, 'heartbeat'])->name('api.v1.ingest.heartbeat');
+
+            // Respaldo del camino rápido MQTT de `docs/07` §6, para tiendas
+            // sin broker propio. Sin Idempotency-Key: no muta stock y un
+            // tránsito repetido es información, no un duplicado a suprimir.
+            Route::post('portal-event', [PortalEventController::class, 'store'])
+                ->name('api.v1.ingest.portal-event');
         });
 
         Route::post('inventory-cycles/{inventoryCycle}/scans', [InventoryCycleController::class, 'storeScans'])
@@ -73,6 +80,12 @@ Route::prefix('v1')->group(function (): void {
         Route::get('alerts', [AlertController::class, 'index'])->name('api.v1.alerts.index');
         Route::post('alerts/{alert}/acknowledge', [AlertController::class, 'acknowledge'])->name('api.v1.alerts.ack');
         Route::post('alerts/{alert}/resolve', [AlertController::class, 'resolve'])->name('api.v1.alerts.resolve');
+
+        // Portal antihurto
+        Route::get('portal-events', [PortalEventController::class, 'index'])->name('api.v1.portal.index');
+        Route::get('portal-events/stats', [PortalEventController::class, 'stats'])->name('api.v1.portal.stats');
+        Route::post('portal-events/{portalEvent}/false-positive', [PortalEventController::class, 'falsePositive'])
+            ->name('api.v1.portal.false-positive');
 
         // ------------------------------------------- POST que mutan stock
         // Llevan Idempotency-Key: un reintento por timeout de red no debe

@@ -1,4 +1,5 @@
 import type { ProcessedTagRead } from '../types/TagRead.js';
+import type { PortalMessage } from './PortalPublisher.js';
 
 export interface HeartbeatPayload {
   device_code: string;
@@ -46,6 +47,21 @@ export class ApiClient {
 
   async postHeartbeat(payload: HeartbeatPayload): Promise<void> {
     await this.post('/api/v1/ingest/heartbeat', payload);
+  }
+
+  /**
+   * Respaldo del camino rápido MQTT. Es más lento —una petición HTTP contra
+   * el broker local no compite—, pero sin broker es esto o nada.
+   */
+  async postPortalEvent(message: PortalMessage): Promise<void> {
+    await this.post('/api/v1/ingest/portal-event', {
+      device_code: this.deviceCode,
+      epc: message.epc,
+      direction: message.direction,
+      confidence: message.confidence,
+      occurred_at: message.occurredAt,
+      evidence: message.evidence,
+    });
   }
 
   private async post(path: string, body: unknown): Promise<void> {

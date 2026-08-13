@@ -7,6 +7,7 @@ export interface MetricsSources {
   pipeline: Pipeline;
   buffer: SqliteBuffer;
   readerConnected: () => boolean;
+  portal?: { snapshot(): Record<string, number> };
 }
 
 export function renderPrometheus(src: MetricsSources): string {
@@ -33,6 +34,17 @@ export function renderPrometheus(src: MetricsSources): string {
   lines.push('# HELP traza_edge_reader_connected Estado de conexión del lector.');
   lines.push('# TYPE traza_edge_reader_connected gauge');
   lines.push(`traza_edge_reader_connected{reader=${reader}} ${src.readerConnected() ? 1 : 0}`);
+
+  if (src.portal) {
+    const portal = src.portal.snapshot();
+    lines.push('# HELP traza_edge_portal_events_total Tránsitos de portal por resultado.');
+    lines.push('# TYPE traza_edge_portal_events_total counter');
+    lines.push(`traza_edge_portal_events_total{result="published"} ${portal['portal.published'] ?? 0}`);
+    // Un `suppressed` alto frente a `published` significa que el portal ve
+    // pasar gente pero no se atreve a clasificar: hay que revisar antenas.
+    lines.push(`traza_edge_portal_events_total{result="suppressed"} ${portal['portal.suppressed'] ?? 0}`);
+    lines.push(`traza_edge_portal_events_total{result="failed"} ${portal['portal.failed'] ?? 0}`);
+  }
 
   return lines.join('\n') + '\n';
 }

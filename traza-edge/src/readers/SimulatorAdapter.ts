@@ -4,6 +4,30 @@ import type { ReaderAdapter } from './ReaderAdapter.js';
 import { createRng } from './rng.js';
 import { resolveScenario, type ScenarioSpec } from './scenarios.js';
 
+interface PortalSample {
+  port: number;
+  rssi: number;
+}
+
+/** Interior, interior, interior, exterior, exterior, exterior: el cliente sale. */
+const FULL_CROSSING: readonly PortalSample[] = [
+  { port: 1, rssi: -46 },
+  { port: 3, rssi: -44 },
+  { port: 1, rssi: -45 },
+  { port: 2, rssi: -43 },
+  { port: 4, rssi: -41 },
+  { port: 2, rssi: -42 },
+];
+
+/** Se asoma, la antena exterior lo roza de lejos, y vuelve adentro. */
+const REVERSAL: readonly PortalSample[] = [
+  { port: 1, rssi: -45 },
+  { port: 3, rssi: -44 },
+  { port: 2, rssi: -66 },
+  { port: 3, rssi: -45 },
+  { port: 1, rssi: -44 },
+];
+
 export interface SimulatorOptions {
   epcPrefix: string;
   scenario: string;
@@ -23,6 +47,8 @@ export class SimulatorAdapter extends EventEmitter implements ReaderAdapter {
   private readonly population: string[];
   private profile?: ReadProfile;
   private tick = 0;
+  /** Paso del tránsito guionizado de cada tag en los escenarios de portal. */
+  private readonly portalSteps = new Map<string, number>();
 
   constructor(
     public readonly id: string,
@@ -86,15 +112,32 @@ export class SimulatorAdapter extends EventEmitter implements ReaderAdapter {
 
     const index = Math.floor(this.rng() * this.population.length);
     const epc = this.population[index] ?? this.population[0]!;
+
+    if (this.spec.kind === 'portal') {
+      const step = this.portalStep(epc);
+
+      // El tag ya terminó su tránsito y se fue. Un portal real no ve al
+      // mismo cliente cruzar en bucle, y simularlo así haría que cualquier
+      // secuencia acabara apareciendo por casualidad.
+      if (step === null) return null;
+
+      return this.makeRead(epc, false, now, step);
+    }
+
     return this.makeRead(epc, false, now);
   }
 
-  private makeRead(epc: string, stray: boolean, now: number): RawTagRead {
+  private makeRead(
+    epc: string,
+    stray: boolean,
+    now: number,
+    portal?: PortalSample,
+  ): RawTagRead {
     const read: RawTagRead = {
       epc,
-      antennaPort: this.antennaFor(),
+      antennaPort: portal?.port ?? this.antennaFor(),
       // Los tags ajenos llegan con RSSI baja: es lo que los delata.
-      rssi: stray ? -75 + this.rng() * 8 : -58 + this.rng() * 20,
+      rssi: portal?.rssi ?? (stray ? -75 + this.rng() * 8 : -58 + this.rng() * 20),
       firstSeen: now,
       lastSeen: now,
       readCount: 1 + Math.floor(this.rng() * 5),
@@ -105,21 +148,32 @@ export class SimulatorAdapter extends EventEmitter implements ReaderAdapter {
     return read;
   }
 
-  /**
-   * En los escenarios de portal las antenas impares son interiores y las
-   * pares exteriores. Un cruce normal recorre interior→exterior; el
-   * escenario dudoso vuelve al interior sin completar el cruce.
-   */
   private antennaFor(): number {
-    if (this.spec.kind !== 'portal') {
-      return 1 + Math.floor(this.rng() * this.spec.antennas);
-    }
+    return 1 + Math.floor(this.rng() * this.spec.antennas);
+  }
 
-    const phase = this.tick % 6;
-    if (this.spec.portalReverses) {
-      return phase < 2 ? 1 : phase < 4 ? 2 : 1;
-    }
-    return phase < 3 ? 1 : 2;
+  /**
+   * Tránsito guionizado por tag. Las antenas impares son interiores y las
+   * pares exteriores.
+   *
+   * El cruce completo termina pegado a las antenas exteriores, con señal
+   * fuerte. El amago solo roza la exterior una vez y desde lejos: por eso
+   * su lectura llega casi en el umbral, y por eso el clasificador puede
+   * distinguir los dos casos con la potencia además de con el tiempo.
+   *
+   * La RSSI de portal es determinista a propósito. Con un valor aleatorio,
+   * el escenario `portal_dudoso` pasaría o fallaría según la semilla, que es
+   * lo contrario de lo que sirve una prueba de regresión.
+   */
+  private portalStep(epc: string): PortalSample | null {
+    const sequence = this.spec.portalReverses ? REVERSAL : FULL_CROSSING;
+    const step = this.portalSteps.get(epc) ?? 0;
+
+    if (step >= sequence.length) return null;
+
+    this.portalSteps.set(epc, step + 1);
+
+    return sequence[step]!;
   }
 
   private generatePopulation(): string[] {

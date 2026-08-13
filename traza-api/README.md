@@ -104,8 +104,10 @@ Un error ahí corrompe identificadores de forma silenciosa e irreversible.
 | Endpoints de stock sobre las vistas | Hecho — base de la épica 4 |
 | Acceso web con sesión (Sanctum SPA) | Hecho |
 | Mensajes de validación en español | Hecho — `lang/es/validation.php` |
+| Difusión en tiempo real por Reverb | Hecho — tarea 3.4 |
+| Portal antihurto: tránsitos, gracia y falsos positivos | Hecho — épica 6 |
+| `traza:listen-portal` (suscriptor MQTT) | Hecho — tarea 6.2 |
 | Catálogo, dispositivos, lotes de etiquetas | Pendiente |
-| Difusión en tiempo real por Reverb | Pendiente — tarea 3.4 |
 
 ## Endpoints
 
@@ -118,11 +120,37 @@ Superficie de `docs/06` §6. `php artisan route:list --path=api/v1` da la lista 
 | `POST /api/v1/ingest/reads` | Ingesta de lecturas, idempotente por `batch_id` |
 | `POST /api/v1/ingest/heartbeat` | Latido del borde |
 | `POST /api/v1/inventory-cycles/{id}/scans` | Escaneos del handheld, deduplicados por EPC |
+| `POST /api/v1/ingest/portal-event` | Tránsito de portal; respaldo del camino MQTT |
 
 **Sesión de usuario** (Sanctum): tags y su historial, ciclos de inventario
 (crear, arrancar, pausar, cerrar, informe, avance por zona), movimientos y
-transferencias, órdenes de recepción, ventas y devoluciones, y la bandeja de
-alertas.
+transferencias, órdenes de recepción, ventas y devoluciones, la bandeja de
+alertas y el portal antihurto (`GET /portal-events`, `GET /portal-events/stats`,
+`POST /portal-events/{id}/false-positive`).
+
+## Procesos de larga duración
+
+Además de `php artisan serve`, el sistema completo necesita:
+
+| Proceso | Para qué |
+|---|---|
+| `php artisan horizon` | Colas: `ProcessReadBatch`, conciliación, informes |
+| `php artisan reverb:start` | WebSocket del avance de ciclo y de las alarmas |
+| `php artisan schedule:work` | Tareas programadas |
+| `php artisan traza:listen-portal` | Camino rápido del portal antihurto |
+
+El suscriptor de portal es el único que es **camino crítico en vivo**: si muere,
+las alarmas dejan de sonar y no hay ningún síntoma visible hasta que roban algo.
+Toca `/tmp/portal-listener.alive` cada 30 s desde su propio bucle, y el
+healthcheck de `infra/docker-compose.prod.yml` lo vigila. Para probarlo sin
+broker existe el respaldo HTTP:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/ingest/portal-event \
+  -H "X-Device-Code: PORTAL-01" -H "X-Device-Token: $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"epc":"3035D9...","direction":"salida","confidence":0.92}'
+```
 
 ### Convenciones
 

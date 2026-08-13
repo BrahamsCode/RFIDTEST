@@ -171,6 +171,26 @@ services:
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
+  # Portal antihurto: suscriptor del camino rápido MQTT (docs/07 §6)
+  # ---------------------------------------------------------------------------
+  portal-listener:
+    build:
+      context: ../traza-api
+      target: development
+    container_name: traza-portal-listener
+    environment:
+      DB_HOST: postgres
+      REDIS_HOST: redis
+      MQTT_HOST: mosquitto
+    volumes:
+      - ../traza-api:/var/www/html
+    depends_on:
+      - api
+      - mosquitto
+    command: php artisan traza:listen-portal -v
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
   # Middleware de borde (con simulador activado en desarrollo)
   # ---------------------------------------------------------------------------
   edge:
@@ -192,6 +212,11 @@ services:
       SIMULATOR_MISS_RATE: "0.03"
       SIMULATOR_STRAY_RATE: "0.02"
       EPC_MASK: "3035D9"
+      # Con PORTAL_ENABLED=true y SIMULATOR_SCENARIO=portal_salida el borde
+      # publica alarmas por MQTT y se puede probar el antihurto sin lector.
+      TRAZA_LOCATION_CODE: ${TRAZA_LOCATION_CODE:-LIM-01}
+      PORTAL_ENABLED: ${PORTAL_ENABLED:-false}
+      PORTAL_MIN_CONFIDENCE: "0.7"
     ports:
       - "9100:9100"   # métricas Prometheus
     volumes:

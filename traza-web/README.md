@@ -35,6 +35,7 @@ la cookie de sesión.
 | `/prendas` | Buscador con tabla virtualizada |
 | `/prendas/:epc` | Ficha de prenda con historial completo |
 | `/alertas` | Bandeja, lo más grave primero |
+| `/portal` | **Portal antihurto**: alarmas en vivo, falso positivo de un toque y tasa de calibración |
 
 ## Dirección visual
 
@@ -62,6 +63,16 @@ barrió una zona **mientras aún puede volver**, en lugar de descubrirlo en el
 informe final, cuando ya se ha generado merma falsa. Tiene sus propias
 pruebas en `src/pages/inventory/CycleLive.test.tsx`.
 
+## El botón de falso positivo
+
+La pantalla del portal existe para una sola cosa: que marcar una alarma como
+falsa cueste **un toque**, sin diálogo de confirmación ni nota obligatoria. Es
+el único dato que permite calibrar el arco, y si cuesta más nadie lo registra;
+un portal con más del 20 % de falsos positivos acaba desconectado, y entonces
+no detecta nada. La tasa se muestra en la misma pantalla, con el aviso de
+recalibración cuando pasa del umbral. Tiene sus pruebas en
+`src/pages/Portal.test.tsx`.
+
 ## Estado de implementación
 
 | Pieza | Estado |
@@ -73,5 +84,6 @@ pruebas en `src/pages/inventory/CycleLive.test.tsx`.
 | Tabla virtualizada | Hecho — tarea 4.5 |
 | Panel de tienda | Hecho — tarea 4.7 |
 | Catálogo y lotes de etiquetas | Pendiente — tarea 4.6 |
-| Tiempo real por Reverb | Pendiente — tarea 3.4; mientras tanto sondea cada 5 s |
+| Tiempo real por Reverb | Hecho — tarea 3.4; sin `VITE_REVERB_KEY` sondea cada 5 s |
+| Portal antihurto y falsos positivos | Hecho — tareas 6.3 y 6.4 |
 | Gráfico de RSSI en la ficha | Pendiente — necesita endpoint de detecciones |

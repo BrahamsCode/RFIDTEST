@@ -322,6 +322,18 @@ export class DirectionStage implements Stage {
 
 > **Advertencia honesta**: esta heurística funciona razonablemente bien pero **no** al 100 %. Un cliente que se detiene en el umbral, da media vuelta y regresa produce trazas ambiguas. Por eso `portal_events` guarda toda la evidencia y la alarma exige `confidence >= 0.7` por defecto. La alternativa robusta es hardware con capacidad de localización (Zebra ATR7000), que cuesta el doble.
 
+### Tres correcciones sobre el borrador de arriba (tarea 6.1)
+
+El código de esta sección es el punto de partida. Al implementarlo aparecieron tres defectos que la versión de `traza-edge/src/pipeline/stages/DirectionStage.ts` corrige:
+
+1. **La confianza ignoraba la potencia.** El texto dice que la confianza sale «de la separación temporal *y del desequilibrio de potencia entre lados*», pero el cálculo solo usaba el tiempo. Es justo el factor que falta el que distingue un cruce de un amago: quien se asoma y retrocede deja **una** lectura débil en la antena exterior, mientras que quien sale de verdad la deja pegada. Ahora `confidence = separación × equilibrio`, donde el equilibrio mide qué cuota de la potencia total reúne el lado de destino (referencia: 25 %).
+
+2. **La normalización de 800 ms daba por supuesto un paso lento.** Con un lector a 200 lecturas/s el cruce entero dura 300 ms y ninguna salida real habría llegado nunca al 0.7 que exige la alarma. La separación se mide ahora contra la duración del propio rastro, así que un cruce limpio puntúa igual vaya la persona deprisa o despacio.
+
+3. **El rastro se borraba aunque no se hubiera clasificado nada.** Con `MIN_SAMPLES = 3`, un cruce real interior-interior-interior-exterior se partía en trozos de tres muestras y ninguno llegaba a tener los dos lados: no se emitía jamás. El rastro solo se descarta ahora cuando ha servido para emitir un evento, con un TTL de 15 s y un tope de 64 muestras para que un tag olvidado en el umbral no haga crecer el mapa sin fin.
+
+El precio de la corrección 1 es explícito: una salida real en la que la antena exterior lee flojo —el tag va al otro lado del cuerpo— se queda en `indeterminado` y no suena. Es un falso negativo aceptado a conciencia, porque P09 prioriza no chillar sin motivo: un portal con muchos falsos positivos acaba desconectado y entonces no detecta nada.
+
 ---
 
 ## 5. Adaptadores de lector
@@ -508,6 +520,17 @@ public function handle(PortalEventService $service): int
 ```
 
 > **Sobre el período de gracia**: `sale_grace_seconds = 120` significa que si la prenda se vendió en los últimos 2 minutos, cruzar el portal es normal. Demasiado corto → falsas alarmas con clientes que tardan en salir. Demasiado largo → un ladrón podría esperar tras una venta legítima. 120 s es un punto de partida razonable; ajustar observando la distribución real de tiempo entre pago y salida.
+
+### Lo que cambia en la implementación (tareas 6.2 y 6.3)
+
+El esquema del suscriptor es el correcto; la versión de `app/Console/Commands/ListenPortalEvents.php` añade lo que hace falta para que aguante en una tienda:
+
+- **La decisión vive en `PortalEventService`, no en el callback.** El comando solo traduce el mensaje MQTT; el servicio es el mismo que usa el respaldo HTTP, así que las dos vías deciden igual y hay un único sitio que probar.
+- **Un mensaje malformado no tumba el proceso.** Si cae, la tienda se queda sin antihurto y nadie se entera hasta que roban algo. JSON ilegible, mensaje sin `epc` o dispositivo desconocido se registran en el log y se descartan.
+- **Reconexión automática indefinida.** La conexión de una tienda de Gamarra se cae varias veces al día y nadie va a reiniciar el proceso a mano. Ojo: `setMaxReconnectAttempts(0)` significa «no intentarlo nunca» en php-mqtt, no «infinito».
+- **Señal de vida desde el bucle.** El proceso toca `/tmp/portal-listener.alive` cada 30 s desde el propio `loop`, que es lo que vigila el healthcheck de `infra/docker-compose.prod.yml`. Tocar el fichero desde fuera del bucle habría dado por sano un proceso vivo pero colgado.
+- **El período de gracia y el estado del tag son comprobaciones distintas.** Una venta hecha en TRAZA ya deja el tag en `vendido`, así que la ventana de 120 s parece redundante — pero no lo es: cubre las ventas que llegan de un POS externo, que escribe la línea sin tocar el ciclo de vida del tag.
+- **Respaldo HTTP.** `POST /api/v1/ingest/portal-event` (token de dispositivo) hace lo mismo por HTTP para las tiendas sin broker y para diagnosticar un portal recién instalado desde `curl`. Es más lento y no se compromete al presupuesto de 800 ms.
 
 ---
 

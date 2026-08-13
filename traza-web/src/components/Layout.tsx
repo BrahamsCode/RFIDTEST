@@ -7,6 +7,7 @@ const SECTIONS = [
   { to: '/stock', label: 'Stock' },
   { to: '/prendas', label: 'Prendas' },
   { to: '/alertas', label: 'Alertas' },
+  { to: '/portal', label: 'Portal' },
 ];
 
 export function Layout() {
