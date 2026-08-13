@@ -83,7 +83,9 @@ services:
     image: eclipse-mosquitto:2
     volumes:
       - ./mosquitto/mosquitto.prod.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/acl:/mosquitto/config/acl:ro
       - ./mosquitto/certs:/mosquitto/certs:ro
+      # Se genera con `mosquitto_passwd`; nunca se versiona.
       - ./mosquitto/passwd:/mosquitto/config/passwd:ro
       - mosquitto-data:/mosquitto/data
     ports:

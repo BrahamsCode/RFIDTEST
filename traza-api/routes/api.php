@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\InventoryCycleController;
 use App\Http\Controllers\Api\V1\MovementController;
 use App\Http\Controllers\Api\V1\ReceivingOrderController;
 use App\Http\Controllers\Api\V1\SaleController;
+use App\Http\Controllers\Api\V1\TagAccessController;
 use App\Http\Controllers\Api\V1\TagController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -31,6 +32,11 @@ Route::prefix('v1')->group(function (): void {
 
         Route::post('inventory-cycles/{inventoryCycle}/scans', [InventoryCycleController::class, 'storeScans'])
             ->name('api.v1.cycles.scans');
+
+        // La clave maestra nunca sale del servidor: el handheld pide la
+        // contraseña del EPC concreto que va a escribir.
+        Route::get('tags/{epc}/access-password', [TagAccessController::class, 'show'])
+            ->name('api.v1.tags.access-password');
     });
 
     // ------------------------------------------------------------- sesión web

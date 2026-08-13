@@ -65,6 +65,7 @@ Es importante fijar expectativas desde el documento fundacional:
 | 13 | `docs/13-kpis-y-analitica.md` | Indicadores, vistas materializadas, tableros, alertas |
 | 14 | `docs/14-roadmap-costos-riesgos.md` | Plan por fases, presupuesto en USD/PEN, análisis de retorno, matriz de riesgos |
 | 15 | `docs/15-plan-de-pruebas.md` | Estrategia de QA, pruebas de RF, criterios de aceptación, pruebas de campo |
+| 16 | `docs/16-documento-de-seguridad.md` | Estado real de la lista de verificación previa a producción |
 | — | `sql/schema.sql` | DDL completo de PostgreSQL |
 | — | `sql/seeds.sql` | Datos de referencia y semilla |
 | — | `sql/vistas-analiticas.sql` | Vistas materializadas y funciones de reporte |

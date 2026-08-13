@@ -13,6 +13,7 @@ use App\Http\Problem;
 use App\Http\Requests\RegisterScansRequest;
 use App\Models\InventoryCycle;
 use App\Models\Location;
+use App\Policies\InventoryCyclePolicy;
 use App\Services\InventoryCycleService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -55,6 +56,13 @@ final class InventoryCycleController extends Controller
             'zone_ids' => ['sometimes', 'array'],
             'zone_ids.*' => ['integer', 'exists:zones,id'],
         ]);
+
+        $denial = app(InventoryCyclePolicy::class)
+            ->create($request->user(), (int) $data['location_id']);
+
+        if ($denial->denied()) {
+            return Problem::forbidden($denial->message());
+        }
 
         $cycle = $this->cycles->create(
             location: Location::findOrFail($data['location_id']),
@@ -122,10 +130,22 @@ final class InventoryCycleController extends Controller
     }
 
     /** Cerrar dispara la conciliación. */
-    public function close(InventoryCycle $inventoryCycle, CycleReconciler $reconciler): JsonResponse
-    {
+    public function close(
+        Request $request,
+        InventoryCycle $inventoryCycle,
+        CycleReconciler $reconciler,
+        InventoryCyclePolicy $policy,
+    ): JsonResponse {
         if ($inventoryCycle->status->isFinished()) {
             return Problem::conflict('El ciclo ya está cerrado.');
+        }
+
+        // Incluye la exigencia de justificación si la exactitud provisional
+        // baja del 90 %: cerrar así genera merma falsa. Ver `docs/12` §2.
+        $denial = $policy->close($request->user(), $inventoryCycle);
+
+        if ($denial->denied()) {
+            return Problem::forbidden($denial->message());
         }
 
         $result = $reconciler->reconcile($inventoryCycle);

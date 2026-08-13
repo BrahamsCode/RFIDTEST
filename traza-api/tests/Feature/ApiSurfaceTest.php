@@ -50,7 +50,8 @@ final class ApiSurfaceTest extends TestCase
                        receiving_order_lines, receiving_orders, tag_replacements, alerts,
                        inventory_cycle_results, inventory_cycle_scans,
                        inventory_cycle_expected, inventory_cycles,
-                       stock_movements, tags RESTART IDENTITY CASCADE');
+                       stock_movements, tags, role_user, roles, users
+                       RESTART IDENTITY CASCADE');
 
         $this->movements = new StockMovementService(new TagStateMachine());
 
@@ -72,12 +73,21 @@ final class ApiSurfaceTest extends TestCase
             'product_id' => $product->id, 'sku' => "SKU-{$suffix}",
             'cost_price' => 18.0, 'sale_price' => 49.9,
         ]);
+        // Con la épica 9 en marcha, un usuario sin rol no puede crear ni
+        // cerrar ciclos: hay que darle uno explícitamente.
+        (new \Database\Seeders\RoleSeeder())->run();
+
         $this->user = User::create([
             'organization_id' => $this->organization->id,
             'name' => 'Jefa de tienda',
             'email' => "jefa-{$suffix}@vivatech-peru.com",
             'password' => 'secreto',
+            'default_location_id' => $this->tienda->id,
         ]);
+        $this->user->roles()->attach(
+            \App\Models\Role::where('code', \App\Enums\RoleCode::JefeTienda->value)->value('id')
+        );
+        $this->user = $this->user->fresh();
     }
 
     // ------------------------------------------------------- convenciones
@@ -388,6 +398,11 @@ final class ApiSurfaceTest extends TestCase
             array_map(fn (Tag $t) => ['epc' => $t->epc], array_slice($tags, 0, 3)),
         );
 
+        // 75 % está por debajo del umbral del 90 %, así que cerrar exige
+        // justificación escrita (`docs/12` §2).
+        \App\Models\InventoryCycle::find($cycle['id'])
+            ->update(['notes' => 'Zona de probadores en obra durante el conteo.']);
+
         $this->actingAs($this->user)
             ->postJson("/api/v1/inventory-cycles/{$cycle['id']}/close")
             ->assertOk()
@@ -450,7 +465,13 @@ final class ApiSurfaceTest extends TestCase
             'location_id' => $this->tienda->id, 'code' => 'INV-API-02',
         ])->json();
 
-        $this->actingAs($this->user)->postJson("/api/v1/inventory-cycles/{$cycle['id']}/close");
+        // Sin escaneos la exactitud es 0 %: hace falta justificar el cierre.
+        \App\Models\InventoryCycle::find($cycle['id'])
+            ->update(['notes' => 'Ciclo anulado por corte de luz.']);
+
+        $this->actingAs($this->user)
+            ->postJson("/api/v1/inventory-cycles/{$cycle['id']}/close")
+            ->assertOk();
 
         $this->actingAs($this->user)
             ->postJson("/api/v1/inventory-cycles/{$cycle['id']}/pause")

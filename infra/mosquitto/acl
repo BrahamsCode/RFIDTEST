@@ -1,0 +1,28 @@
+# =============================================================================
+#  TRAZA — ACL de MQTT
+#  Cada borde publica SOLO en el tópico de su tienda. Ver docs/12 §8.
+#
+#  Sin esto, un borde comprometido en una tienda podría publicar eventos de
+#  portal falsos a nombre de cualquier otra.
+# =============================================================================
+
+# El backend se suscribe a todas las tiendas, pero no publica.
+user traza-api
+topic read traza/+/portal
+topic read traza/+/estado
+
+# --- Un bloque por tienda. Añadir uno nuevo al dar de alta cada borde. ------
+# El usuario se crea con:
+#   mosquitto_passwd -c /mosquitto/config/passwd edge-lim01
+
+user edge-lim01
+topic write traza/LIM-01/portal
+topic write traza/LIM-01/estado
+topic read  traza/LIM-01/comandos
+
+user edge-lim02
+topic write traza/LIM-02/portal
+topic write traza/LIM-02/estado
+topic read  traza/LIM-02/comandos
+
+# Nadie más tiene acceso: sin regla explícita, Mosquitto deniega.

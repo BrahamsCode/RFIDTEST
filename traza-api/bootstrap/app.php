@@ -22,6 +22,14 @@ return Application::configure(basePath: dirname(__DIR__))
             'device' => \App\Http\Middleware\AuthenticateDevice::class,
             'idempotency' => \App\Http\Middleware\EnsureIdempotency::class,
         ]);
+
+        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
+
+        // Límite de tasa: 300/min por usuario, 2000/min por dispositivo.
+        // Ver AppServiceProvider::configureRateLimiting().
+        $middleware->api(prepend: [
+            \Illuminate\Routing\Middleware\ThrottleRequests::class.':api',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         // Los errores de la API se sirven en RFC 7807, que es la convención

@@ -460,29 +460,62 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 - **Contexto**: `docs/12-seguridad-y-privacidad.md` §2
 - **Entregable**: los 7 roles, políticas de Laravel, doble aprobación
 - **Aceptación**: prueba por rol para cada operación sensible; `tecnico` no puede ajustar stock
-- [ ]
+- [x] `RoleCode` con los 7 roles y sus permisos, `InventoryCyclePolicy` y
+  `StockAdjustmentPolicy`. Prueba parametrizada por rol: `tecnico` gestiona
+  lectores pero no ajusta stock, y `jefe_tienda` declara merma pero no toca
+  perfiles de lectura.
+- Los cuatro umbrales de doble aprobación verificados, incluido el cierre de
+  ciclo con exactitud por debajo del 90 % sin justificación escrita.
+- **Efecto colateral que conviene saber**: hasta ahora cualquier usuario
+  autenticado podía crear y cerrar ciclos. Ahora hace falta rol, y eso rompió
+  tres pruebas de `ApiSurfaceTest` que pasaban porque la API estaba sin
+  autorizar. Se corrigieron las pruebas, no la política.
 
 ### 9.2 Auditoría
 - **Entregable**: `AuditObserver` sobre los modelos sensibles + informes periódicos
 - **Aceptación**: todo ajuste manual queda registrado con usuario, dispositivo e IP
-- [ ]
+- [~] `AuditObserver` sobre tags, ciclos, dispositivos, usuarios, organización
+  y variantes, con usuario, dispositivo, IP y agente. Omite contraseñas y
+  hashes de token. Ignora los cambios que solo tocan `updated_at`.
+- `stock_movements` no lleva observador porque **es** su propia auditoría: el
+  trigger de la base impide reescribirlo.
+- **Faltan los informes periódicos.**
 
 ### 9.3 Access password derivado
 - **Contexto**: `docs/12-seguridad-y-privacidad.md` §3
 - **Entregable**: derivación HMAC-SHA256 y endpoint que la entrega al handheld por EPC
 - **Aceptación**: la clave maestra nunca sale del servidor; el handheld solo obtiene la contraseña del EPC concreto
-- [ ]
+- [x] `GET /api/v1/tags/{epc}/access-password`, con token de dispositivo y
+  restringido a la organización del propio dispositivo. Conocer una
+  contraseña no revela ninguna otra.
+- Se añade el kill password derivado, distinto del de acceso: dejarlo en el
+  valor de fábrica permite a cualquiera desactivar la etiqueta de forma
+  irreversible.
+- Se cubre el caso de que la derivación dé `00000000`, que equivale a un tag
+  sin proteger. Improbable, pero existe.
 
 ### 9.4 ⚠️ Cumplimiento de la Ley 29733
 - **Contexto**: `docs/12-seguridad-y-privacidad.md` §4
 - **Entregable**: documento de seguridad, cartel informativo al cliente, información a empleados, consulta legal
 - **Aceptación**: lista de verificación de `docs/12` §8, sección Cumplimiento, completa
-- [ ]
+- [~] Documento de seguridad escrito en `docs/16-documento-de-seguridad.md`,
+  con el estado real de cada punto de la lista de `docs/12` §8.
+- **El resto no es una tarea de desarrollo**: cartel informativo, información
+  a empleados, asesoría legal sobre la Ley 29733, homologación MTC y
+  procedimiento de respuesta a incidentes con responsable asignado.
 
 ### 9.5 Endurecimiento de infraestructura
 - **Entregable**: TLS, WireGuard, MQTT sobre TLS con ACL, escaneo de imágenes, gestión de secretos
 - **Aceptación**: lista de verificación de `docs/12` §8, secciones Infraestructura y Aplicación, completa
-- [ ]
+- [~] Hechos: cabeceras de seguridad (CSP, X-Frame-Options,
+  X-Content-Type-Options, Referrer-Policy, HSTS solo bajo TLS) y límites de
+  tasa de `docs/06` §6.
+- **Fallo corregido**: el compose de producción montaba `mosquitto.prod.conf`,
+  `certs/` y `passwd`, y **ninguno existía**: el broker no habría arrancado.
+  Se añaden la configuración de producción (solo 8883 con TLS, sin listener
+  en claro) y la ACL por tienda, más un README con cómo generar los secretos.
+- **Faltan**: WireGuard en los bordes, escaneo de imágenes y `composer audit` /
+  `npm audit` en CI (tarea 0.4).
 
 ---
 
