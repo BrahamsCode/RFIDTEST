@@ -243,7 +243,18 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 - **Contexto**: `docs/06-backend-laravel.md` §8
 - **Entregable**: evento `InventoryCycleProgressed` sobre Reverb
 - **Aceptación**: la web refleja el avance con menos de 3 s de retardo
-- [ ]
+- [~] `InventoryCycleProgressed` y `PortalAlarmRaised` con sus canales
+  privados y autorización por tienda, más el hook `useCycleProgress` en la
+  web. Se difunde **un evento por lote**, no uno por EPC: en un barrido de
+  20 000 prendas serían 20 000 eventos.
+- Si `VITE_REVERB_KEY` no está configurada, la web cae al sondeo de 5 s en
+  vez de romperse. Con Reverb activo el respaldo baja a 60 s.
+- **Falta medir el retardo real con un servidor Reverb en marcha**: aquí no
+  hay ninguno levantado.
+- **Aviso sobre `routes/channels.php`**: los parámetros del canal llegan como
+  **cadena**. Tiparlos como `int` con `declare(strict_types=1)` provoca un
+  TypeError que Laravel convierte en denegación silenciosa, sin error visible
+  en ninguna parte.
 
 ### 3.5 Rendimiento por zona
 - **Entregable**: endpoint que expone `cycle_zone_performance()`
@@ -274,10 +285,9 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 - [~] Progreso, desglose por zona y `SlowZoneHint`, con 5 pruebas. Verificado
   con datos reales: con la sala al 95 % y la trastienda al 0 %, el aviso
   nombra la trastienda.
-- **En vez de `useCycleProgress` sobre Reverb, sondea cada 5 s.** La difusión
-  por WebSocket es la tarea 3.4 y no está hecha; sin sondeo la pantalla
-  habría que recargarla a mano, que es peor. Cambiarlo luego es sustituir el
-  `refetchInterval` por el hook.
+- Usa `useCycleProgress` sobre Reverb (tarea 3.4), con sondeo de respaldo.
+- **Falta comprobar el avance en tiempo real con el simulador y un servidor
+  Reverb en marcha.**
 
 ### 4.3 Stock y reposición
 - **Entregable**: listados de stock, valorización, antigüedad y reposición sobre las vistas SQL

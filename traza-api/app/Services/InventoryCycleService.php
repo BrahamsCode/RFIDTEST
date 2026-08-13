@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Enums\CycleScope;
 use App\Enums\CycleStatus;
+use App\Events\InventoryCycleProgressed;
 use App\Models\InventoryCycle;
 use App\Models\Location;
 use Illuminate\Support\Facades\DB;
@@ -91,6 +92,17 @@ final class InventoryCycleService
                 ],
             );
         }
+
+        /*
+         * Un evento por lote, no por EPC: en un barrido de 20 000 prendas,
+         * difundir cada lectura serían 20 000 eventos y el navegador no daría
+         * abasto. El handheld ya envía en lotes de 500.
+         */
+        InventoryCycleProgressed::dispatch(
+            $cycle->id,
+            $this->scannedCount($cycle),
+            (int) ($cycle->expected_count ?? 0),
+        );
 
         return count($rows);
     }

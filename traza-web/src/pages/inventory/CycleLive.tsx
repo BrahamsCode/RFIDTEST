@@ -6,6 +6,8 @@ import {
   Button, Callout, Card, EmptyState, ErrorState, PageShell, ProgressBar, Spinner,
 } from '../../components/ui';
 import { useState } from 'react';
+import { useCycleProgress } from '../../hooks/useCycleProgress';
+import { isRealtimeEnabled } from '../../lib/echo';
 
 /** Por debajo de esto, una zona casi seguro que no se barrió. */
 const LAGGARD_THRESHOLD = 60;
@@ -14,25 +16,26 @@ export function CycleLive() {
   const { id } = useParams();
   const cycleId = Number(id);
 
+  // Los datos llegan por WebSocket. El sondeo de respaldo es lento a
+  // propósito, y solo entra si Reverb no está configurado o se cae la
+  // conexión: sin él la pantalla habría que recargarla a mano.
+  const progress = useCycleProgress(cycleId);
+
   const { data: cycle, isPending, isError } = useQuery({
     queryKey: ['cycle', cycleId],
     queryFn: () => cycles.get(cycleId),
-    /*
-     * El diseño previsto usa WebSocket (Reverb) y deja este refetch como
-     * respaldo lento. Mientras la difusión por Reverb no esté (tarea 3.4),
-     * se sondea cada 5 s si el ciclo está abierto: es la diferencia entre
-     * una pantalla útil durante el barrido y una que hay que recargar a
-     * mano.
-     */
-    refetchInterval: (query) =>
-      query.state.data && !isFinished(query.state.data) ? 5_000 : false,
+    refetchInterval: (query) => {
+      if (!query.state.data || isFinished(query.state.data)) return false;
+
+      return isRealtimeEnabled() ? 60_000 : 5_000;
+    },
   });
 
   if (isPending) return <Spinner />;
   if (isError || !cycle) return <ErrorState>No se pudo cargar el ciclo.</ErrorState>;
 
-  const expected = cycle.expected_count ?? 0;
-  const scanned = cycle.scanned_count;
+  const expected = progress?.expected ?? cycle.expected_count ?? 0;
+  const scanned = progress?.scanned ?? cycle.scanned_count;
   const pct = expected > 0 ? (scanned / expected) * 100 : 0;
 
   return (
