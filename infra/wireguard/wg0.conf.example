@@ -1,0 +1,32 @@
+# Borde de tienda. Copiar a `wg0.conf` y rellenar.
+#
+# `wg0.conf` NO se versiona: lleva la clave privada del equipo.
+# Ver el README de este directorio para el alta de una tienda.
+
+[Interface]
+# Clave privada generada EN ESTE equipo. No debe salir de aquí.
+PrivateKey = <CLAVE_PRIVADA_DEL_BORDE>
+
+# La que asigne el central. Una por tienda, apuntada en el inventario:
+# repetir una IP da un túnel que funciona a ratos, que es peor que uno roto.
+Address = 10.8.0.11/32
+
+# El DNS del central, para resolver nombres internos por el túnel.
+DNS = 10.8.0.1
+
+[Peer]
+PublicKey = <CLAVE_PUBLICA_DEL_CENTRAL>
+PresharedKey = <CLAVE_COMPARTIDA>
+
+Endpoint = vpn.traza.pe:51820
+
+# Solo la red del túnel: por aquí va lo que habla con el central, no la
+# navegación del equipo. Con 0.0.0.0/0 todo el tráfico de la tienda saldría
+# por el central, que ni lo necesita ni quiere pagar ese ancho de banda.
+AllowedIPs = 10.8.0.0/24
+
+# Imprescindible: el borde está detrás del NAT del router de la tienda. Sin
+# esto la traducción caduca con unos minutos de silencio y el central deja de
+# poder iniciar la conexión — el borde sigue enviando lecturas sin enterarse,
+# pero el SSH de soporte no entra.
+PersistentKeepalive = 25

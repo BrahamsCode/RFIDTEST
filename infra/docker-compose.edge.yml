@@ -1,0 +1,107 @@
+# =============================================================================
+#  TRAZA — Borde de tienda
+#  Uso:  docker compose -f docker-compose.edge.yml --env-file .env.edge up -d
+#
+#  Va uno de estos por tienda, en el mini-PC que hay junto al rack de lectores.
+#  El servidor central se despliega aparte con docker-compose.prod.yml.
+#
+#  Todo el tráfico hacia el central sale por el túnel WireGuard: la API no se
+#  expone a internet (`docs/11` §9). La doble capa —TLS dentro de WireGuard—
+#  es deliberada y está en `docs/12` §5: el túnel protege de que alguien de la
+#  tienda enchufe un portátil al switch y hable con el central, y el TLS
+#  protege de que un borde comprometido vea el tráfico de otro.
+# =============================================================================
+
+name: traza-edge
+
+services:
+
+  # ---------------------------------------------------------------- túnel
+  #
+  # Arranca antes que el borde y el borde comparte su pila de red
+  # (`network_mode: service:wireguard`). Así el borde **no tiene otra salida**:
+  # si el túnel se cae, no hay una ruta directa por la que las lecturas
+  # puedan escaparse en claro a internet. Se quedan en el buffer local, que
+  # es exactamente lo que debe pasar.
+  wireguard:
+    image: linuxserver/wireguard:1.0.20250521
+    container_name: traza-wireguard
+    cap_add: [NET_ADMIN, SYS_MODULE]
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: America/Lima
+    volumes:
+      - ./wireguard:/config
+      - /lib/modules:/lib/modules:ro
+    sysctls:
+      net.ipv4.conf.all.src_valid_mark: "1"
+    ports:
+      # El puerto de métricas del borde se publica aquí y no en el borde,
+      # porque es este contenedor el dueño de la pila de red.
+      - "127.0.0.1:9100:9100"
+    healthcheck:
+      # `wg show` lista las interfaces activas: si el túnel no levantó, no
+      # imprime nada y el healthcheck falla. Comprobar solo que el proceso
+      # vive no sirve — el contenedor sigue en pie con la interfaz caída.
+      test: ["CMD-SHELL", "wg show | grep -q interface"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: always
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  # ----------------------------------------------------------------- borde
+  edge:
+    image: ${REGISTRY}/traza-edge:${TAG:-latest}
+    container_name: traza-edge
+    env_file: [.env.edge]
+    environment:
+      NODE_ENV: production
+      # Direcciones dentro del túnel: 10.8.0.1 es el central. No se pone aquí
+      # el nombre público a propósito — si alguien lo cambiara por uno
+      # resoluble desde internet, el tráfico dejaría de ir por el túnel sin
+      # que nada fallara de forma visible.
+      TRAZA_API_URL: https://10.8.0.1
+      MQTT_URL: mqtts://10.8.0.1:8883
+      READER_MODE: ${READER_MODE:-llrp}
+      METRICS_PORT: "9100"
+      EDGE_BUFFER_PATH: /app/data/buffer.sqlite
+    depends_on:
+      wireguard: { condition: service_healthy }
+    network_mode: service:wireguard
+    volumes:
+      - edge-buffer:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9100/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: always
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  # --------------------------------------------------------- actualizaciones
+  #
+  # Solo el borde, y sin tocar WireGuard: una actualización automática del
+  # túnel que saliera mal dejaría la tienda incomunicada y sin forma de
+  # entrar a arreglarla, que es la única avería que obliga a coger un taxi
+  # hasta Gamarra.
+  watchtower:
+    image: containrrr/watchtower:1.7.1
+    container_name: traza-watchtower
+    command: --interval 3600 --cleanup traza-edge
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: always
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+volumes:
+  edge-buffer:

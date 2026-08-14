@@ -7,10 +7,16 @@ dist/
 build/
 .gradle/
 
-# Entornos: nunca versionar los rellenos
+# Entornos: nunca versionar los rellenos, sí las plantillas.
+#
+# La readmisión es `*.example` y no `.env.example` a secas: con la segunda,
+# un `.env.edge.example` perfectamente legítimo quedaba fuera sin avisar, y
+# esa clase de fallo solo se nota cuando alguien clona el repo y no encuentra
+# la plantilla que la documentación le dice que copie.
 .env
 .env.*
 !.env.example
+!*.example
 
 # Locales
 *.sqlite
@@ -18,3 +24,25 @@ build/
 *.sqlite-shm
 dump.rdb
 .DS_Store
+
+# ------------------------------------------------------------------ secretos
+#
+# Las plantillas `*.example` sí se versionan; los ficheros rellenos, nunca.
+# En vez de enumerar nombres se excluye el directorio entero y se readmite lo
+# que es plantilla: así un fichero nuevo con material de clave queda fuera por
+# omisión, que es como debe fallar esto.
+infra/wireguard/*
+!infra/wireguard/*.example
+!infra/wireguard/README.md
+
+# Broker MQTT: contraseñas de los bordes y certificados TLS.
+infra/mosquitto/passwd
+infra/mosquitto/certs/
+
+# Material de clave suelto, esté donde esté.
+*.pem
+*.key
+*.p12
+privatekey
+publickey
+preshared

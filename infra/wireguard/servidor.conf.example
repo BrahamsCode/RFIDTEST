@@ -1,0 +1,42 @@
+# Central. Copiar a `wg0.conf` en el servidor y rellenar.
+#
+# Un bloque [Peer] por tienda. Se añaden con `wg set` + `wg-quick save wg0`
+# sin reiniciar la interfaz, para no cortar las tiendas ya conectadas.
+
+[Interface]
+PrivateKey = <CLAVE_PRIVADA_DEL_CENTRAL>
+Address = 10.8.0.1/24
+ListenPort = 51820
+
+# El central sí enruta: los portátiles de soporte tienen que poder llegar a
+# las tiendas. Requiere net.ipv4.ip_forward=1 en el anfitrión.
+PostUp   = iptables -A FORWARD -i %i -j ACCEPT
+PostDown = iptables -D FORWARD -i %i -j ACCEPT
+
+# ----------------------------------------------------------------- tiendas
+#
+# `AllowedIPs` de un solo host y no del rango entero: WireGuard asocia cada
+# IP de origen a la clave que la tiene permitida, así que el /32 impide por
+# construcción que un borde comprometido suplante a otra tienda. Con /24
+# podría publicar lecturas a nombre de cualquiera.
+
+[Peer]
+# LIM-01 · Gamarra 1
+PublicKey = <CLAVE_PUBLICA_DEL_BORDE_LIM01>
+PresharedKey = <CLAVE_COMPARTIDA_LIM01>
+AllowedIPs = 10.8.0.11/32
+
+[Peer]
+# LIM-02 · Gamarra 2
+PublicKey = <CLAVE_PUBLICA_DEL_BORDE_LIM02>
+PresharedKey = <CLAVE_COMPARTIDA_LIM02>
+AllowedIPs = 10.8.0.12/32
+
+# ---------------------------------------------------------------- soporte
+
+[Peer]
+# Portátil de soporte. Sin PersistentKeepalive: no está siempre encendido y
+# no hace falta que el central pueda iniciar la conexión hacia él.
+PublicKey = <CLAVE_PUBLICA_DEL_PORTATIL>
+PresharedKey = <CLAVE_COMPARTIDA_SOPORTE>
+AllowedIPs = 10.8.0.101/32

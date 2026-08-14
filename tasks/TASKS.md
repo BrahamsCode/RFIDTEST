@@ -957,7 +957,47 @@ nunca en desarrollo y se hace siempre en producción.
   Por eso la auditoría de npm son **dos** trabajos: el de producción bloquea el
   pipeline, el de desarrollo informa. Un pipeline que falla siempre acaba
   ignorado, y entonces no avisa del día que sí importa.
-- **Faltan**: WireGuard en los bordes.
+- **WireGuard hecho**: `infra/docker-compose.edge.yml` —que `prod` ya citaba y
+  no existía—, más las plantillas de borde y central en `infra/wireguard/` y
+  su README con el alta de una tienda. `docker compose config` valida.
+  - **El borde comparte pila de red con el túnel**
+    (`network_mode: service:wireguard`). Así, si el túnel se cae, el borde
+    **no tiene otra salida**: no queda una ruta directa por la que las
+    lecturas se escapen en claro a internet, y se quedan en el buffer local,
+    que es justo lo que debe pasar. Un contenedor con su propia red haría lo
+    contrario sin que nada fallara de forma visible.
+  - Cada tienda entra en el central con `AllowedIPs` de **un solo host**.
+    WireGuard asocia cada IP de origen a la clave que la tiene permitida, así
+    que el `/32` impide por construcción que un borde comprometido publique
+    lecturas a nombre de otra tienda. Con `/24` podría. Es el mismo
+    razonamiento que la ACL de Mosquitto.
+  - En el borde, en cambio, `AllowedIPs = 10.8.0.0/24` y **no** `0.0.0.0/0`:
+    por el túnel va lo que habla con el central, no la navegación del equipo.
+  - `PersistentKeepalive = 25` no es opcional: los bordes están detrás del NAT
+    del router de la tienda. Sin él la traducción caduca con unos minutos de
+    silencio y **el central deja de poder iniciar la conexión**. El borde
+    sigue enviando lecturas sin enterarse, pero el SSH de soporte no entra
+    hasta que al borde le toque transmitir — la diferencia entre resolver una
+    incidencia en remoto y coger un taxi hasta Gamarra.
+  - Watchtower actualiza **solo el borde** y no el túnel: una actualización
+    automática de WireGuard que saliera mal dejaría la tienda incomunicada y
+    sin forma de entrar a arreglarla.
+  - Las claves se generan **en el equipo de la tienda**; la privada no viaja.
+- **Fallo corregido de paso, y de los que importan**: `.gitignore` no excluía
+  ninguno de los secretos que los README daban por excluidos — ni `passwd` ni
+  `certs/` de Mosquitto. Cualquiera que siguiera esas instrucciones al pie de
+  la letra habría acabado subiendo las contraseñas de los bordes al
+  repositorio. Ahora se excluye el directorio de WireGuard entero y se
+  readmite solo lo que es plantilla, de modo que **un fichero nuevo con
+  material de clave queda fuera por omisión**, que es como debe fallar esto.
+  Comprobado con `git check-ignore` en los dos sentidos.
+- **Segundo fallo del `.gitignore`**: la readmisión era `!.env.example`, que
+  solo cubre ese nombre exacto, así que un `.env.edge.example` legítimo
+  quedaba fuera sin avisar. Se pasa a `!*.example`. Es de esos fallos que solo
+  se notan cuando alguien clona el repo y no encuentra la plantilla que la
+  documentación le dice que copie.
+- **Sigue pendiente y no es tarea de desarrollo**: generar el material de
+  clave real, levantar el servidor y hacer el alta de las tiendas.
 
 ---
 
