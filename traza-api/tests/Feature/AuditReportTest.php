@@ -167,8 +167,8 @@ final class AuditReportTest extends TestCase
         $ana = $this->user('Ana');
 
         // 03:00 hora de Lima: fuera de la franja 07:00–22:00.
-        $this->auditAt($ana, now()->setTimezone('America/Lima')->setTime(3, 0)->utc());
-        $this->auditAt($ana, now()->setTimezone('America/Lima')->setTime(14, 0)->utc());
+        $this->auditAt($ana, $this->limaAt(3));
+        $this->auditAt($ana, $this->limaAt(14));
 
         $filas = $this->reports->afterHoursAccess(now()->subDays(7))['filas'];
 
@@ -179,7 +179,7 @@ final class AuditReportTest extends TestCase
     public function test_el_informe_de_accesos_levanta_alerta(): void
     {
         $ana = $this->user('Ana');
-        $this->auditAt($ana, now()->setTimezone('America/Lima')->setTime(2, 30)->utc());
+        $this->auditAt($ana, $this->limaAt(2, 30));
 
         $this->artisan('traza:audit-report accesos --days=7')->assertSuccessful();
 
@@ -252,6 +252,24 @@ final class AuditReportTest extends TestCase
                 occurredAt: now()->subDays(2),
             ));
         }
+    }
+
+    /**
+     * Una hora concreta de Lima **del día de ayer**.
+     *
+     * El «de ayer» no es adorno. Con `now()->setTime(3, 0)` la prueba fallaba
+     * entre medianoche y las 07:00 de Lima: a las 00:06, las 03:00 de hoy
+     * todavía no han pasado, el informe filtra por `BETWEEN ... AND now()` y
+     * el registro quedaba fuera con toda la razón. Una prueba que solo falla
+     * de madrugada es peor que una que no existe — se acaba culpando al
+     * entorno.
+     */
+    private function limaAt(int $hour, int $minute = 0): Carbon
+    {
+        return now()->setTimezone('America/Lima')
+            ->subDay()
+            ->setTime($hour, $minute)
+            ->utc();
     }
 
     private function auditAt(User $user, Carbon $at): void
