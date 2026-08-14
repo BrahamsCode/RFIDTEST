@@ -147,6 +147,21 @@ Además de `php artisan serve`, el sistema completo necesita:
 | `php artisan schedule:work` | Tareas programadas |
 | `php artisan traza:listen-portal` | Camino rápido del portal antihurto |
 
+## Tareas programadas
+
+`routes/console.php`, todas con `onOneServer()` y hora de Lima.
+
+| Cuándo | Comando | Para qué |
+|---|---|---|
+| Día 20, 03:00 | `traza:rotate-partitions` | Crea las particiones de los dos meses siguientes |
+| Diario, 03:30 | `traza:check-projection` | Control de integridad de `docs/05` §6 |
+| Día 5, 02:00 | `traza:export-cold-reads` | Exporta a frío la partición de hace 4 meses |
+
+La purga de particiones **no** va en el cron: `traza:rotate-partitions --purge`
+se ejecuta a mano, y aun así se niega a borrar lo que no conste exportado y
+verificado. Borrar una partición sin exportar son tres meses de trazabilidad
+que no vuelven.
+
 El suscriptor de portal es el único que es **camino crítico en vivo**: si muere,
 las alarmas dejan de sonar y no hay ningún síntoma visible hasta que roban algo.
 Toca `/tmp/portal-listener.alive` cada 30 s desde su propio bucle, y el

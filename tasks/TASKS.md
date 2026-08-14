@@ -616,19 +616,47 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 - **Contexto**: `docs/05-modelo-de-datos.md` §5
 - **Entregable**: comando `traza:rotate-partitions` programado el día 20
 - **Aceptación**: crea la partición de los dos meses siguientes y purga las de más de 3 meses; alerta si `tag_reads_default` tiene filas
-- [ ]
+- [x] Los tres criterios con prueba. Dos decisiones que no están en el
+      documento y conviene conocer:
+      - **La purga no es el comportamiento por defecto.** Sin `--purge` el
+        comando solo informa de lo que borraría. Es irreversible y el cron
+        corre solo.
+      - **Con `--purge` comprueba antes la exportación a frío.** Se niega a
+        borrar una partición que no conste exportada y verificada en la
+        auditoría, que es el orden que exige `docs/13` §6.
 
 ### 8.3 Control de integridad nocturno
 - **Contexto**: `docs/05-modelo-de-datos.md` §6
 - **Entregable**: comando `traza:check-projection` con alerta crítica
 - **Aceptación**: una desincronización provocada artificialmente dispara la alerta
-- [ ]
+- [x] Consulta literal de `docs/05` §6, alerta de severidad 1, y las dos
+      direcciones del desajuste probadas: proyección de menos y de más. No hay
+      opción para excluir ubicaciones ni bajar el umbral — cualquier
+      diferencia significa que hay un camino de código que muta `tags` sin
+      pasar por `StockMovementService`.
+      La alerta guarda una muestra de 20 filas y no el detalle entero: una
+      alerta con 4 000 filas dentro no la lee nadie.
 
 ### 8.4 Exportación a frío
 - **Contexto**: `docs/13-kpis-y-analitica.md` §6
 - **Entregable**: comando `traza:export-cold-reads` a MinIO
 - **Aceptación**: la purga solo se ejecuta si la exportación del mes existe y se verificó
-- [ ]
+- [x] **Medido con datos reales**: 131 045 lecturas exportadas en 2 s, 4.4 MB
+      comprimidos, y el CSV descomprimido tiene exactamente 131 046 líneas
+      (cabecera incluida).
+
+      El borrador de `docs/13` §6 usa `COPY ... TO PROGRAM`, y no funciona en
+      este despliegue: lo ejecuta el **servidor** de PostgreSQL, así que exige
+      superusuario y que la ruta exista en el contenedor de la base, no en el
+      del API. `COPY ... TO STDOUT` tampoco sirve — PDO lo rechaza en una
+      sentencia preparada con «General error: 3». Se recorre con cursor por
+      lotes y se escribe con `fputcsv`: más lento que `COPY`, memoria acotada,
+      y funciona sin privilegios especiales. Para un trabajo mensual, la
+      velocidad no es lo que decide.
+
+      La verificación compara **bytes** entre origen y destino, no solo que la
+      subida no lanzara excepción: un fallo a mitad deja el objeto truncado y
+      el proveedor lo da por bueno.
 
 ### 8.5 Observabilidad
 - **Contexto**: `docs/11-infraestructura-docker.md` §7
@@ -640,7 +668,30 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 - **Contexto**: `docs/11-infraestructura-docker.md` §6
 - **Entregable**: `scripts/backup.sh`, servicio de respaldo, procedimiento de restauración
 - **Aceptación**: una restauración completa en staging cronometrada por debajo de 2 h
-- [ ]
+- [x] `scripts/backup.sh` y `scripts/restore.sh`, los dos limpios de
+      `shellcheck` y **ejecutados de verdad** contra la base sembrada: respaldo
+      de 308 KB verificado, restaurado sobre `traza_staging`, 1 471 movimientos
+      y 1 107 tags recuperados, y el `traza:check-projection` sobre la base
+      restaurada devuelve 0 discrepancias.
+
+      **El cronometraje no vale como prueba del RTO**: aquí la base tiene mil
+      tags y tarda un segundo. La restauración de 2 h hay que medirla sobre un
+      volcado de producción, y eso es la prueba mensual del primer lunes que
+      exige el documento.
+
+      Tres cosas que el borrador de `docs/11` §6 no hacía:
+      - Verifica que el volcado **contiene datos de `stock_movements`**, no
+        solo que `pg_restore --list` no falla: un `pg_dump` cortado a mitad
+        produce un fichero que `--list` acepta.
+      - Excluye solo las particiones de `tag_reads` de más de 30 días, no
+        todas: `--exclude-table-data='tag_reads_*'` dejaría sin respaldo el mes
+        en curso, que todavía no está en frío.
+      - Escribe métricas del último respaldo correcto para que Prometheus
+        avise si dejan de actualizarse. Dos reglas nuevas en `alerts.yml`.
+
+      `restore.sh` se niega a restaurar sobre una base cuyo nombre no lleve
+      `staging` o `test` salvo con `--force`: teclear el nombre de producción
+      ahí es fácil y no tiene vuelta atrás.
 
 ---
 

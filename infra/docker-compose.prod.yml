@@ -183,12 +183,21 @@ services:
   # ---------------------------------------------------------------------------
   # Copias de seguridad
   # ---------------------------------------------------------------------------
+  # El guion vive en `scripts/` de la raíz del repositorio, no en `infra/`:
+  # también se ejecuta a mano al restaurar y desde CI.
   backup:
     image: postgres:16
     env_file: [.env.prod]
+    environment:
+      PGHOST: postgres
+      # Sin esto la copia es local y la regla 3-2-1 no se cumple; el guion lo
+      # dice en cada ejecución para que no pase inadvertido.
+      BACKUP_BUCKET: ${BACKUP_BUCKET:-}
+      AWS_ENDPOINT: ${AWS_ENDPOINT:-}
     volumes:
       - ./backups:/backups
-      - ./scripts/backup.sh:/backup.sh:ro
+      - ../scripts/backup.sh:/backup.sh:ro
+      - ../scripts/restore.sh:/restore.sh:ro
     entrypoint: ["/bin/bash", "/backup.sh"]
     depends_on: [postgres]
     restart: always

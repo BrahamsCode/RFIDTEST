@@ -71,3 +71,30 @@ groups:
             Más tránsitos indeterminados que salidas durante una hora: las
             antenas están mal colocadas o el umbral de confianza es demasiado
             alto para la geometría real de la puerta.
+
+  - name: traza-respaldos
+    rules:
+      # `scripts/backup.sh` escribe estas series en un fichero que recoge el
+      # node_exporter en modo textfile. Un respaldo que deja de ejecutarse en
+      # silencio es lo habitual, y solo se descubre el día que hace falta.
+      - alert: RespaldoAtrasado
+        expr: time() - traza_backup_last_success_timestamp > 172800
+        for: 1h
+        labels: { severity: critica }
+        annotations:
+          summary: 'Hace más de 48 h que no hay un respaldo verificado'
+          description: >
+            La ventana normal es diaria. Dos días sin respaldo correcto
+            significa que el trabajo falla o el contenedor no arranca.
+
+      - alert: RespaldoSospechosamentePequeno
+        expr: >
+          traza_backup_last_size_bytes
+            < 0.5 * avg_over_time(traza_backup_last_size_bytes[7d])
+        for: 1h
+        labels: { severity: alta }
+        annotations:
+          summary: 'El último respaldo pesa la mitad que la media de la semana'
+          description: >
+            Un volcado que encoge de golpe suele ser un `pg_dump` que se cortó
+            a mitad. Pasa la verificación de `pg_restore --list` igual.
