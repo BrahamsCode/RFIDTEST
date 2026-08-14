@@ -104,6 +104,7 @@ Un error ahí corrompe identificadores de forma silenciosa e irreversible.
 | Endpoints de stock sobre las vistas | Hecho — base de la épica 4 |
 | Acceso web con sesión (Sanctum SPA) | Hecho |
 | Mensajes de validación en español | Hecho — `lang/es/validation.php` |
+| Semilla de desarrollo (4 seeders) | Hecho — tarea 1.6 |
 | Difusión en tiempo real por Reverb | Hecho — tarea 3.4 |
 | Portal antihurto: tránsitos, gracia y falsos positivos | Hecho — épica 6 |
 | `traza:listen-portal` (suscriptor MQTT) | Hecho — tarea 6.2 |

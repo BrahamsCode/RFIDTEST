@@ -139,7 +139,27 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 ### 1.6 Semilla de desarrollo
 - **Entregable**: seeders Laravel equivalentes a `sql/seeds.sql`
 - **Aceptación**: `php artisan db:seed` genera ≥ 1 000 tags, y el control de integridad de `docs/05` §6 devuelve 0 filas
-- [ ]
+- [x] Cuatro seeders (`Role`, `Reference`, `Tag`, `Operations`). **1 107 tags y
+      el control de integridad en 0 filas**, con 8 pruebas que lo fijan.
+
+      `sql/seeds.sql` **no pasa su propio control**: cargado tal cual devuelve
+      12 filas y 51 unidades de desajuste. Dos causas, las dos comprobadas
+      contra una base recién creada:
+      1. Los tags que acaban en `no_visto` o `perdido` solo reciben el
+         movimiento de `tarado`, así que `stock_as_of()` los cuenta como
+         existencias y la proyección no (23 tags).
+      2. `commissioned_at` y `sold_at` se sortean por separado sobre 200 y 60
+         días, de modo que 28 de 1 038 prendas se vendían antes de existir; el
+         último movimiento por fecha pasaba a ser el tarado.
+
+      Un tercer fallo salió al escribir el seeder y es de la misma familia: un
+      movimiento fechado en el futuro es invisible para `stock_as_of(loc,
+      now())` y produce el mismo desajuste. Los tres tienen prueba.
+
+      El seeder pasa por `StockMovementService` en vez de escribir
+      `stock_movements` a mano, así que la coherencia entre proyección y
+      movimientos no depende de que yo acierte, y los EPC los compone el codec
+      real en vez de concatenar hex.
 
 ---
 
