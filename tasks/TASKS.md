@@ -34,9 +34,44 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 - **Aceptación**: los cuatro arrancan en local; `docker compose up` levanta el entorno completo
 - **Referencia**: `infra/docker-compose.yml`
 - [~] Los cuatro proyectos arrancan y sus pruebas pasan. `docker compose config`
-  valida en dev y prod, pero **falta verificar `docker compose up` con un daemon
-  real**: el entorno donde se construyó no tenía Docker. Se cierra cuando alguien
-  lo levante en OrbStack.
+  valida en dev, prod y borde.
+- **Levantado ya con un daemon real**, no solo validado:
+  - `postgres`, `redis` y `mosquitto` arrancan del compose de desarrollo tal
+    cual está y quedan *healthy*. Comprobados de verdad y no por el estado del
+    contenedor: las 18 migraciones corren sobre el PostgreSQL del compose y
+    dejan las 30 relaciones de partición de `tag_reads`, Redis responde
+    `PONG`, y Mosquitto completa un `mosquitto_pub`/`mosquitto_sub` de ida y
+    vuelta.
+  - **Las 502 pruebas de la API pasan contra el PostgreSQL del contenedor**,
+    que es lo que de verdad valida la imagen: extensiones, ENUM nativos,
+    particionado, disparadores y funciones PL/pgSQL incluidos.
+- **Y aquí apareció el fallo que esta tarea existía para encontrar**: la
+  imagen de la API **no se podía construir**, ni aquí ni en la máquina de
+  nadie. El `Dockerfile` fija `php:8.3-cli-alpine` —como dice `docs/11`— pero
+  el `composer.lock` se había resuelto en una máquina con PHP 8.4, así que
+  arrastraba `symfony/*` v8.1, que exige `>=8.4.1`. `composer install` dentro
+  de la imagen moría con «Your lock file does not contain a compatible set of
+  packages».
+
+  Ningún `docker compose config` detecta esto, ni ninguna prueba: en local
+  todo funciona porque local **es** 8.4. Solo aparece al construir la imagen,
+  que es justo lo que el criterio de aceptación pedía hacer.
+
+  Arreglado fijando `config.platform.php = 8.3.33` en `composer.json` y
+  volviendo a resolver el lock. Se elige eso y no subir la imagen a PHP 8.4
+  porque 8.3 es lo que fija `docs/11`; `platform` es exactamente el mecanismo
+  para «resuelve como si corrieras la versión del despliegue», así que la
+  máquina de desarrollo puede seguir con 8.4 y el lock sigue siendo
+  desplegable. Y cierra la puerta a que vuelva a pasar. Comprobado: las 502
+  pruebas siguen pasando con las dependencias reducidas a la rama 7.4 de
+  Symfony.
+- **Lo que sigue sin comprobarse aquí** es el `docker compose up` completo con
+  la API construida, y ya no por culpa del proyecto: dentro del contenedor de
+  construcción, `composer` no puede autenticarse contra github.com a través
+  del proxy de este entorno de desarrollo. La resolución de dependencias sí
+  pasa ahora —falla al **descargar**, no al **resolver**—, que es la
+  diferencia que importa. Se cierra del todo levantándolo en OrbStack con
+  salida a internet normal.
 
 ### 0.4 Pipeline de CI
 - **Contexto**: `docs/11-infraestructura-docker.md` §4
