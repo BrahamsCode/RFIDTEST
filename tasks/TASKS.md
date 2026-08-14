@@ -45,6 +45,17 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
   - **Las 502 pruebas de la API pasan contra el PostgreSQL del contenedor**,
     que es lo que de verdad valida la imagen: extensiones, ENUM nativos,
     particionado, disparadores y funciones PL/pgSQL incluidos.
+  - **La imagen de producción del borde se construye y arranca.** Levantada en
+    la red del compose contra el Mosquitto del contenedor: lee del simulador,
+    2 908 lecturas por el pipeline en 21 s, `/health` y `/metrics`
+    respondiendo, y el buffer acumulando porque la API no estaba levantada —
+    el comportamiento correcto.
+  - De paso quedó descartada una sospecha razonable: `better-sqlite3` es un
+    módulo nativo y `node:22-alpine` es musl, no glibc, así que era candidato
+    a no tener binario precompilado y necesitar `python3`/`make`/`g++` en la
+    imagen. **No hace falta**: instala en 5 s sobre Alpine y el módulo abre
+    una base y ejecuta consultas. El Dockerfile del borde está bien como
+    está.
 - **Y aquí apareció el fallo que esta tarea existía para encontrar**: la
   imagen de la API **no se podía construir**, ni aquí ni en la máquina de
   nadie. El `Dockerfile` fija `php:8.3-cli-alpine` —como dice `docs/11`— pero
