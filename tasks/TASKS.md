@@ -825,6 +825,22 @@ nunca en desarrollo y se hace siempre en producción.
   pruebas de coherencia. Incluye el control de integridad de `docs/05` §6:
   `v_current_stock` y `stock_as_of()` coinciden, o sea que la proyección
   `tags` no se ha desviado de `stock_movements`.
+- **Medidas con volumen de producción** (100 000 prendas, 7,2 M lecturas; ver
+  8.6). Una vista que va bien con mil prendas y se arrastra con cien mil es un
+  fallo que no se ve hasta que la tienda ya depende de ella:
+
+  | Vista | Tiempo |
+  |---|---:|
+  | `v_stock_valuation` | 67 ms |
+  | `v_current_stock` | 51 ms |
+  | `v_replenishment_needed` | 41 ms |
+  | `v_stock_aging` | 22 ms |
+  | `REFRESH mv_daily_stock` | 76 ms |
+
+  Son `count(*)` sobre la vista entera, que fuerza a evaluarla toda: el peor
+  caso, no el de la primera página. `v_shrinkage`, `v_inventory_accuracy` y
+  `v_device_health` salen en ~1 ms, pero **eso no cuenta como medición**: el
+  fixture no tiene mermas, ni ciclos, ni latidos. Quedan sin medir a escala.
 
 ### 8.2 Rotación de particiones
 - **Contexto**: `docs/05-modelo-de-datos.md` §5
@@ -838,6 +854,18 @@ nunca en desarrollo y se hace siempre en producción.
       - **Con `--purge` comprueba antes la exportación a frío.** Se niega a
         borrar una partición que no conste exportada y verificada en la
         auditoría, que es el orden que exige `docs/13` §6.
+- **Enclavamiento probado de punta a punta**, no solo con dobles: sobre la
+  base a escala (ver 8.6) se creó una partición fuera de retención con 100 000
+  lecturas y se recorrió la secuencia entera.
+  1. `--purge` sin exportación → *«Estas particiones no tienen exportación
+     verificada y NO se purgan»*. La partición sigue con sus 100 000 filas.
+  2. `traza:export-cold-reads` → 855 630 bytes en frío.
+  3. `--purge` → *«Partición tag_reads_2026_03 eliminada»*, y el CSV a frío
+     sigue ahí, que es justo la condición que permitió borrarla.
+
+  Lo que se estaba comprobando no es que el comando borre: es que **no se
+  pueda borrar sin haber salvado antes**. Es irreversible y lo ejecuta un cron
+  de madrugada sin nadie mirando.
 
 ### 8.3 Control de integridad nocturno
 - **Contexto**: `docs/05-modelo-de-datos.md` §6
@@ -858,6 +886,13 @@ nunca en desarrollo y se hace siempre en producción.
 - [x] **Medido con datos reales**: 131 045 lecturas exportadas en 2 s, 4.4 MB
       comprimidos, y el CSV descomprimido tiene exactamente 131 046 líneas
       (cabecera incluida).
+
+      **Repetido a escala de producción** con una partición mensual entera de
+      las de verdad (ver 8.6): **2 400 585 lecturas en 25,6 s**, 11 MB
+      comprimidos, y el CSV descomprimido con 2 400 586 líneas — las filas más
+      la cabecera, exacto. Dieciocho veces más datos y sigue siendo un trabajo
+      mensual de medio minuto, así que la decisión de cambiar `COPY` por un
+      cursor con `fputcsv` no cuesta nada en la práctica.
 
       El borrador de `docs/13` §6 usa `COPY ... TO PROGRAM`, y no funciona en
       este despliegue: lo ejecuta el **servidor** de PostgreSQL, así que exige
