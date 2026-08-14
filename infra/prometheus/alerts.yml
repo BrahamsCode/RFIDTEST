@@ -1,0 +1,73 @@
+# Alertas de infraestructura. Las de negocio (merma, exactitud) viven en la
+# aplicación: aquí solo lo que indica que el sistema técnico está roto.
+#
+# Cada regla lleva su `for`, y no es un detalle: sin él, un corte de red de
+# treinta segundos despierta a alguien de madrugada para nada, y a la tercera
+# vez se silencian todas.
+
+groups:
+  - name: traza-edge
+    rules:
+      - alert: BordeSinResponder
+        expr: up{job="traza-edge"} == 0
+        for: 5m
+        labels: { severity: critica }
+        annotations:
+          summary: 'El borde de {{ $labels.tienda }} lleva 5 min sin responder'
+          description: >
+            Sin borde no hay captura de lecturas. El buffer local sigue
+            guardando si el proceso vive y solo cayó la red, pero si el equipo
+            está apagado se pierde todo lo que pase mientras tanto.
+
+      - alert: LectorDesconectado
+        expr: traza_edge_reader_connected == 0
+        for: 10m
+        labels: { severity: critica }
+        annotations:
+          summary: 'Lector {{ $labels.reader }} desconectado en {{ $labels.tienda }}'
+
+      - alert: BufferCreciendo
+        expr: traza_edge_buffer_depth > 50000
+        for: 30m
+        labels: { severity: alta }
+        annotations:
+          summary: 'El buffer de {{ $labels.tienda }} no baja'
+          description: >
+            Media hora por encima de 50 000 lecturas pendientes significa que
+            el vaciado no da abasto o el API rechaza los lotes. El límite del
+            buffer son 2 000 000 de filas; al llegar empieza a descartar las
+            más antiguas.
+
+      - alert: VaciadoLento
+        expr: >
+          histogram_quantile(0.95,
+            rate(traza_edge_flush_duration_seconds_bucket[15m])) > 10
+        for: 15m
+        labels: { severity: media }
+        annotations:
+          summary: 'El vaciado de {{ $labels.tienda }} tarda más de 10 s en el p95'
+
+      # La métrica más útil del sistema, según `docs/07` §9. Si sube de
+      # golpe, o el vecino instaló RFID, o entró mercadería sin tarar. Las dos
+      # cosas hay que saberlas el mismo día.
+      - alert: SubidaDeEpcAjenos
+        expr: >
+          rate(traza_edge_reads_dropped_total{stage="epc_mask"}[15m])
+            > 3 * rate(traza_edge_reads_total{stage="passed"}[15m])
+        for: 20m
+        labels: { severity: media }
+        annotations:
+          summary: 'En {{ $labels.tienda }} se descartan más EPC ajenos que propios'
+
+      - alert: PortalSinClasificar
+        expr: >
+          rate(traza_edge_portal_events_total{direction="indeterminado"}[1h])
+            > rate(traza_edge_portal_events_total{direction="salida"}[1h])
+        for: 1h
+        labels: { severity: media }
+        annotations:
+          summary: 'El portal de {{ $labels.tienda }} no logra clasificar los cruces'
+          description: >
+            Más tránsitos indeterminados que salidas durante una hora: las
+            antenas están mal colocadas o el umbral de confianza es demasiado
+            alto para la geometría real de la puerta.

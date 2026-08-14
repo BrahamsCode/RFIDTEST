@@ -12,7 +12,7 @@ import { Flusher } from './buffer/Flusher.js';
 import { ApiClient } from './transport/ApiClient.js';
 import { PortalPublisher, type MqttLike } from './transport/PortalPublisher.js';
 import { Heartbeat } from './health/Heartbeat.js';
-import { startMetricsServer } from './health/metrics.js';
+import { Histogram, RollingCounter, startMetricsServer } from './health/metrics.js';
 import type { AntennaConfig, PipelineContext, ProcessedTagRead } from './types/TagRead.js';
 import type { Env } from './config/index.js';
 
@@ -94,7 +94,13 @@ async function main(): Promise<void> {
 
   const buffer = new SqliteBuffer(env.EDGE_BUFFER_PATH, env.EDGE_BUFFER_MAX_ROWS);
   const api = new ApiClient(env.TRAZA_API_URL, env.TRAZA_DEVICE_TOKEN, env.TRAZA_DEVICE_CODE);
-  const flusher = new Flusher(buffer, api, env.EDGE_FLUSH_BATCH);
+  // Buckets pensados para lo que se ve en una tienda: por debajo de medio
+  // segundo va fino, por encima de 10 s es que la red de la galería está
+  // saturada y el buffer va a crecer.
+  const flushDuration = new Histogram([0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30]);
+  const readsLastMinute = new RollingCounter();
+
+  const flusher = new Flusher(buffer, api, env.EDGE_FLUSH_BATCH, flushDuration);
 
   // Camino rápido del portal: MQTT si hay broker, HTTP si no. Solo se
   // conecta cuando el equipo es realmente un portal; en un handheld sería
@@ -120,8 +126,9 @@ async function main(): Promise<void> {
 
     // Primero la alarma, después el registro: el orden importa porque el
     // presupuesto son 800 ms y escribir en SQLite puede esperar.
-    if (portal?.shouldPublish(processed)) void portal.publish(processed);
+    if (portal) void portal.publish(processed);
 
+    readsLastMinute.add();
     pending.push(processed);
   });
   reader.on('error', (err) => console.error('[reader]', err.message));
@@ -137,13 +144,24 @@ async function main(): Promise<void> {
   };
   const drainTimer = setInterval(drainToBuffer, 1000);
 
-  const heartbeat = new Heartbeat(api, pipeline, buffer, env.TRAZA_DEVICE_CODE, () => ({ [reader.id]: connected }), VERSION);
+  const heartbeat = new Heartbeat({
+    api,
+    pipeline,
+    buffer,
+    deviceCode: env.TRAZA_DEVICE_CODE,
+    readerStatus: () => ({ [reader.id]: connected }),
+    version: VERSION,
+    readsLastMinute: () => readsLastMinute.value(),
+  });
+
   const metrics = startMetricsServer(env.METRICS_PORT, {
     readerId: reader.id,
     pipeline,
     buffer,
     readerConnected: () => connected,
     portal,
+    flushDuration,
+    readsLastMinute: () => readsLastMinute.value(),
   });
 
   await reader.connect();

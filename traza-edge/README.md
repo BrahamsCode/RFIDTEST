@@ -59,8 +59,12 @@ PORTAL_ENABLED=true SIMULATOR_SCENARIO=portal_salida npm run dev
 
 ## Observabilidad
 
-- `GET :9100/health` — estado y profundidad del buffer
+- `GET :9100/health` — estado, profundidad del buffer y lecturas del último minuto
 - `GET :9100/metrics` — formato Prometheus
+
+La configuración de recolección y las seis reglas de alerta están en
+`infra/prometheus/`. Verificado con un Prometheus real: objetivo en `up`, las
+métricas de `docs/07` §9 presentes y las reglas evaluando.
 
 La métrica más útil es `traza_edge_reads_dropped_total{stage="epc_mask"}`. Si
 sube de golpe, o el vecino instaló RFID, o entró mercadería sin tarar.

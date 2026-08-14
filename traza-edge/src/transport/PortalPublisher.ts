@@ -46,6 +46,11 @@ export class PortalPublisher {
   private published = 0;
   private suppressed = 0;
   private failed = 0;
+  private readonly byDirection: Record<string, number> = {
+    salida: 0,
+    entrada: 0,
+    indeterminado: 0,
+  };
 
   constructor(private readonly options: PortalPublisherOptions) {}
 
@@ -67,6 +72,9 @@ export class PortalPublisher {
    * completo.
    */
   async publish(read: ProcessedTagRead): Promise<boolean> {
+    const direction = read.direction ?? 'indeterminado';
+    this.byDirection[direction] = (this.byDirection[direction] ?? 0) + 1;
+
     if (!this.shouldPublish(read)) {
       this.suppressed++;
       return false;
@@ -75,7 +83,7 @@ export class PortalPublisher {
     const message: PortalMessage = {
       deviceCode: this.options.deviceCode,
       epc: read.epc,
-      direction: read.direction ?? 'indeterminado',
+      direction,
       confidence: read.confidence ?? 0,
       occurredAt: new Date(read.lastSeen).toISOString(),
       evidence: read.evidence ?? {},
@@ -108,6 +116,11 @@ export class PortalPublisher {
       'portal.published': this.published,
       'portal.suppressed': this.suppressed,
       'portal.failed': this.failed,
+      // Por dirección, que es lo que pide `docs/07` §9: un portal que solo
+      // ve entradas está mirando al lado equivocado.
+      'portal.direction.salida': this.byDirection['salida'] ?? 0,
+      'portal.direction.entrada': this.byDirection['entrada'] ?? 0,
+      'portal.direction.indeterminado': this.byDirection['indeterminado'] ?? 0,
     };
   }
 }

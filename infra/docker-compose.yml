@@ -229,6 +229,24 @@ services:
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
+  # Observabilidad. En desarrollo basta Prometheus; Grafana va en producción.
+  # ---------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: traza-prometheus
+    volumes:
+      - ./prometheus/prometheus.dev.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+    ports:
+      - "9090:9090"
+    depends_on:
+      - edge
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
   # Aplicación web
   # ---------------------------------------------------------------------------
   web:

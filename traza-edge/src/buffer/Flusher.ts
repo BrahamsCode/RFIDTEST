@@ -2,6 +2,11 @@ import { randomUUID } from 'node:crypto';
 import type { ApiClient } from '../transport/ApiClient.js';
 import type { SqliteBuffer } from './SqliteBuffer.js';
 
+export interface FlushObserver {
+  /** Duración del intento, en segundos. Se registra también si falla. */
+  observe(seconds: number): void;
+}
+
 export class Flusher {
   private delay = 1000;
   private timer?: NodeJS.Timeout;
@@ -11,6 +16,7 @@ export class Flusher {
     private readonly buffer: SqliteBuffer,
     private readonly api: ApiClient,
     private readonly batchSize = 500,
+    private readonly duration?: FlushObserver,
   ) {}
 
   start(): void {
@@ -30,10 +36,20 @@ export class Flusher {
     const items = this.buffer.take(this.batchSize);
     if (items.length === 0) return 0;
 
-    await this.api.postReads(
-      randomUUID(),
-      items.map((i) => i.payload),
-    );
+    // Se cronometra también el intento fallido: un vaciado que tarda 30 s en
+    // dar timeout es justo el síntoma que interesa ver en la gráfica, y
+    // medir solo los éxitos lo escondería.
+    const started = process.hrtime.bigint();
+
+    try {
+      await this.api.postReads(
+        randomUUID(),
+        items.map((i) => i.payload),
+      );
+    } finally {
+      this.duration?.observe(Number(process.hrtime.bigint() - started) / 1e9);
+    }
+
     this.buffer.ack(items.map((i) => i.id));
     return items.length;
   }

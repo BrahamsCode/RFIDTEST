@@ -232,7 +232,35 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 - **Contexto**: `docs/07-middleware-rfid.md` §9
 - **Entregable**: `Heartbeat`, endpoint `/metrics` en formato Prometheus, endpoint `/health`
 - **Aceptación**: las métricas listadas en §9 aparecen y Prometheus las recoge
-- [ ]
+- [x] **Verificado con un Prometheus 3.1 de verdad**, no solo con pruebas
+      unitarias: el borde arrancado contra el simulador, el objetivo en `up`, y
+      las seis consultas devolviendo datos —incluida
+      `histogram_quantile(0.95, rate(traza_edge_flush_duration_seconds_bucket[5m]))`.
+      Al matar el borde, `BordeSinResponder` pasó a `pending`, así que las
+      reglas también evalúan.
+
+      Faltaban tres de las métricas de §9 y una estaba mal:
+      - `traza_edge_flush_duration_seconds` no existía. Se añade como
+        histograma, cronometrando **también los intentos fallidos**: un
+        vaciado que tarda 30 s en dar timeout es justo el síntoma que
+        interesa, y medir solo los éxitos lo escondería.
+      - `traza_edge_portal_events_total` usaba la etiqueta `result` en vez de
+        `direction`. Ahora expone las dos series: la de `docs/07` §9 por
+        dirección, y `traza_edge_portal_publish_total` por resultado.
+      - El latido enviaba como `reads_last_min` el **acumulado desde el
+        arranque**. Un lector muerto seguía reportando millones de lecturas y
+        nadie veía que había dejado de leer. Se sustituye por un contador de
+        ventana móvil real.
+      - El latido no mandaba `cpu_percent` ni `temperature_c`, que el
+        documento sí pide. La CPU se calcula por diferencia entre muestras
+        (una sola lectura de `os.cpus()` da la media desde el arranque) y la
+        temperatura sale de `/sys/class/thermal`, con null donde no hay sensor.
+
+      Se añaden `infra/prometheus/{prometheus,prometheus.dev,alerts}.yml` con
+      seis reglas —validadas con `promtool`— y el servicio en el compose de
+      desarrollo. El fichero de desarrollo es aparte a propósito: con los tres
+      objetivos de producción, `BordeSinResponder` estaría disparada siempre en
+      local y el equipo aprendería a ignorarla.
 
 ---
 

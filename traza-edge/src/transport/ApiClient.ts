@@ -8,6 +8,8 @@ export interface HeartbeatPayload {
   readers: Record<string, boolean>;
   uptime_s: number;
   version: string;
+  cpu_percent?: number | null;
+  temperature_c?: number | null;
 }
 
 export class ApiError extends Error {
