@@ -211,6 +211,70 @@ final class LabelBatchTest extends TestCase
         $this->assertStringContainsString('CAMISA XZ - OFERTA', $zpl);
     }
 
+    // ------------------------------------------- tamaño físico de la etiqueta
+
+    public function test_el_zpl_declara_el_tamano_de_la_etiqueta(): void
+    {
+        /*
+         * Sin `^PW`/`^LL` la impresora usa lo que tenga configurado y ZPL
+         * recorta en silencio lo que no cabe. Renderizando este mismo ZPL a
+         * 2×1 pulgadas —un colgante de ropa normal— el SKU desaparecía entero
+         * y el código de barras salía cortado, sin un solo aviso.
+         */
+        $zpl = (new ZplRenderer)->label('3035D919080C0E403B9ACA2A', ['name' => 'X', 'sku' => 'S1']);
+
+        $this->assertStringContainsString('^PW609', $zpl);   // 3" a 203 ppp
+        $this->assertStringContainsString('^LL406', $zpl);   // 2" a 203 ppp
+    }
+
+    public function test_se_niega_a_generar_una_etiqueta_donde_no_cabe(): void
+    {
+        /*
+         * Una etiqueta recortada es peor que ninguna: sale del rollo con buen
+         * aspecto, se cuelga de la prenda, y el fallo aparece semanas después
+         * en la caja de una tienda con cola. Mejor reventar el lote antes de
+         * gastar el primer inlay.
+         */
+        $this->expectExceptionMessageMatches('/recortaría lo que sobra sin avisar/');
+
+        (new ZplRenderer(widthInches: 2.0, heightInches: 1.0))
+            ->label('3035D919080C0E403B9ACA2A', ['name' => 'X', 'sku' => 'S1']);
+    }
+
+    public function test_un_nombre_largo_no_invade_el_sku(): void
+    {
+        /*
+         * En confección los nombres largos son la norma. Sin recortar, el
+         * nombre sigue escribiendo hacia la derecha y **se superpone al SKU**:
+         * los dos quedan ilegibles y ZPL no avisa de nada. Comprobado
+         * renderizando el ZPL en un intérprete de verdad.
+         *
+         * Se recorta en PHP y no con `^FB`: un bloque de una sola línea no
+         * trunca, amontona las líneas una sobre otra, que es aún peor.
+         */
+        $zpl = (new ZplRenderer)->label('3035D919080C0E403B9ACA2A', [
+            'name' => 'Casaca Impermeable Con Capucha Desmontable Talla Especial',
+            'sku' => 'SKU-0004-XL',
+        ]);
+
+        preg_match('/\^FO30,30\^A0N,28,28\^FD(.*?)\^FS/', $zpl, $m);
+
+        $this->assertNotEmpty($m, 'No se encontró el campo del nombre.');
+        $this->assertLessThanOrEqual(22, mb_strlen($m[1]));
+        $this->assertStringEndsWith('.', $m[1]);
+        // Y el SKU sigue entero, que es lo que se estaba protegiendo.
+        $this->assertStringContainsString('SKU SKU-0004-XL', $zpl);
+    }
+
+    public function test_un_nombre_corto_no_se_toca(): void
+    {
+        $zpl = (new ZplRenderer)->label('3035D919080C0E403B9ACA2A', [
+            'name' => 'Polo Basico', 'sku' => 'S1',
+        ]);
+
+        $this->assertStringContainsString('^FDPOLO BASICO^FS', $zpl);
+    }
+
     // ------------------------------------------------------- reimpresión
 
     public function test_reimprimir_no_consume_seriales_nuevos(): void

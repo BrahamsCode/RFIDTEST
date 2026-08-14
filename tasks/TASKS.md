@@ -584,9 +584,38 @@ nunca en desarrollo y se hace siempre en producción.
       - Hay reimpresión por EPC concreto: si la impresora se atasca a mitad de
         rollo, volver a emitir el lote duplicaría el inventario de la variante.
 
-      **Sin impresora real**: el ZPL está verificado como texto contra los
-      comandos de `docs/04` §5, no impreso en una Zebra. Eso llega con el
-      hardware (tarea 0.1).
+      **El ZPL ya no está solo comprobado como texto: se renderiza en un
+      intérprete ZPL de verdad** (Labelary, 8 puntos/mm) y se mira la etiqueta
+      resultante. Cuatro casos —normal, con metacaracteres, mínimo sin precio
+      ni barcode, y nombre largo—, los cuatro sin un solo aviso.
+
+      Y eso destapó **dos fallos que leer el ZPL no enseña**, los dos del
+      mismo tipo: **ZPL recorta en silencio**. Ni error, ni aviso, ni nada — y
+      una impresora hace exactamente lo mismo.
+
+      1. **No se declaraba el tamaño de la etiqueta.** Sin `^PW`/`^LL` manda
+         lo que tenga configurada la impresora. Renderizado a 2×1 pulgadas,
+         que es un colgante de ropa normal, **el SKU desaparecía entero y el
+         código de barras salía cortado e ilegible**; a 2,5×1,5 el SKU se
+         truncaba a «SKU SKU—». La prenda se cuelga con una etiqueta que en
+         caja no escanea y no se descubre hasta que hay cola. Ahora el ZPL
+         declara su tamaño y el renderer **se niega a generar una etiqueta que
+         no cabe**: mejor reventar el lote que gastar el rollo.
+      2. **Un nombre largo se superponía al SKU.** «Casaca Impermeable Con
+         Capucha Desmontable» —lo normal en confección— seguía escribiendo
+         hacia la derecha y dejaba los dos ilegibles. Se recorta antes de
+         emitir. Y se recorta en PHP y no con `^FB`, porque un bloque de una
+         sola línea **no trunca: amontona** todas las líneas una sobre otra,
+         que es todavía peor. También comprobado renderizando.
+
+      El criterio para qué se sacrifica: perder el final del nombre es
+      asumible, está en el sistema; perder el SKU no, porque es lo que mira el
+      personal cuando el código de barras no escanea.
+
+      **Sigue sin imprimirse en una Zebra física**, que es lo único que puede
+      confirmar la escritura del inlay y la marca VOID. Eso llega con el
+      hardware (tarea 0.1). Pero el diseño visible ya está validado por algo
+      que no es mi criterio leyendo comandos.
 
 ### 4.7 Panel de tienda
 - **Contexto**: `docs/13-kpis-y-analitica.md` §3.1
@@ -888,10 +917,58 @@ nunca en desarrollo y se hace siempre en producción.
       y 1 107 tags recuperados, y el `traza:check-projection` sobre la base
       restaurada devuelve 0 discrepancias.
 
-      **El cronometraje no vale como prueba del RTO**: aquí la base tiene mil
-      tags y tarda un segundo. La restauración de 2 h hay que medirla sobre un
-      volcado de producción, y eso es la prueba mensual del primer lunes que
-      exige el documento.
+      **RTO medido a escala de producción.** El cronometraje anterior no valía
+      —mil tags se restauran en un segundo siempre—, así que se generó una base
+      del tamaño que tendría TRAZA con **5 tiendas**, que es el punto donde
+      `docs/14` §5 dice que el sistema tiene sentido económico:
+
+      | | |
+      |---|---|
+      | Prendas | 100 000 (5 × 20 000, el escenario de `docs/05` §2.3) |
+      | Lecturas | 7 200 000 en los 90 días de retención |
+      | Movimientos | 142 857 |
+      | Tamaño de la base | 1 748 MB |
+      | **Respaldo** | **30 s** → 31 MB comprimidos |
+      | **Restauración** | **14 s** |
+      | **Total** | **44 s frente a un objetivo de 2 h** |
+
+      El margen es de 160×, así que el escenario de 20 tiendas de `docs/05`
+      —cuatro veces estos datos— sigue estando dos órdenes de magnitud por
+      debajo del objetivo. El RTO no es el riesgo de este sistema.
+
+      **Y lo restaurado se comprueba, no se cuenta**: `traza:check-projection`
+      sobre la base restaurada dice «proyección y movimientos cuadran en 5
+      ubicaciones». Contar filas solo demuestra que llegaron; esto demuestra
+      que llegaron coherentes.
+
+      Matiz honesto: la restauración recupera las particiones **calientes**
+      (3,6 M de lecturas de julio y agosto). Mayo y junio quedan fuera a
+      propósito, ya exportadas a frío, y recuperarlas es traerlas de MinIO. No
+      hacen falta para que la tienda vuelva a operar, que es lo que mide el
+      RTO.
+
+      El fixture queda en `database/perf/escala-produccion.sql` para poder
+      repetir la medición. **Pasa el control de integridad del propio
+      proyecto**, que costó tres intentos y es la parte que más enseña:
+      - `stock_as_of()` no suma entradas y salidas: coge el **último**
+        movimiento de cada prenda y mira su `state_after`. Un libro con
+        `tarado` y `recepcion` hacia la misma tienda dice que la prenda entró
+        dos veces sin salir.
+      - Las salidas con fecha futura son invisibles a `stock_as_of(loc,
+        now())` y dejan la prenda contada como stock — el mismo fallo que ya
+        tuvo `TagSeeder`. Pero recortarlas con un `LEAST(..., now())` a secas
+        las coloca *antes* de su propio tarado en las prendas taradas hoy, y
+        entonces el último movimiento vuelve a ser el tarado. Hay que caer
+        entre las dos cosas.
+      - Con `n % 1600` para la variante y `n % 300` para la antigüedad, los
+        dos módulos se aliasean (1600 mod 300 = 100) y **un tercio** de las
+        prendas de una variante concreta acaban taradas el mismo día. En
+        conjunto la desviación parecía del 1,7 %; por variante era del 33 %.
+        Repartido ahora con un hash.
+
+      La prueba mensual del primer lunes sigue teniendo sentido, pero ya no
+      para descubrir si el RTO se cumple: para detectar el día que deje de
+      cumplirse.
 
       Tres cosas que el borrador de `docs/11` §6 no hacía:
       - Verifica que el volcado **contiene datos de `stock_movements`**, no
