@@ -878,6 +878,10 @@ nunca en desarrollo y se hace siempre en producción.
       pasar por `StockMovementService`.
       La alerta guarda una muestra de 20 filas y no el detalle entero: una
       alerta con 4 000 filas dentro no la lee nadie.
+- **A escala de producción tarda 650 ms** (100 000 prendas en 5 tiendas, ver
+  8.6). Corre a las 03:30 y compara la proyección entera contra el libro de
+  movimientos, así que era el candidato natural a volverse impracticable al
+  crecer. No lo es.
 
 ### 8.4 Exportación a frío
 - **Contexto**: `docs/13-kpis-y-analitica.md` §6
@@ -932,6 +936,13 @@ nunca en desarrollo y se hace siempre en producción.
       `traza_stock_projection_mismatch`, profundidad de colas). Las consultas
       caras van con caché de 55 s: Prometheus sondea cada 30 s y la
       comprobación de discrepancia recorre `stock_movements` entero.
+
+      **Medido a escala de producción** (ver 8.6): el endpoint tarda **470 ms
+      en frío**, y son casi todos de la consulta de discrepancia — el conteo
+      de `tag_reads_default` son 26 ms y las alertas abiertas 1 ms. Con sondeo
+      cada 30 s y caché de 55 s, aproximadamente un sondeo de cada dos lo
+      paga; el `scrape_timeout` por omisión son 10 s, así que no hay riesgo de
+      que el objetivo caiga. La caché no era una precaución teórica.
 
       Tres tableros de Grafana provisionados desde el repositorio, con las
       **21 consultas verificadas** contra Prometheus: ninguna con error de
