@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Domain\Devices\DeviceToken;
 use App\Enums\AlertKind;
 use App\Jobs\ProcessReadBatch;
 use App\Models\Alert;
@@ -19,7 +20,6 @@ use App\Services\AlertService;
 use App\Services\InventoryCycleService;
 use App\Services\TagResolver;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
@@ -31,6 +31,17 @@ use Tests\TestCase;
 final class IngestReadsTest extends TestCase
 {
     private const TOKEN = 'token-de-prueba-del-borde';
+
+    /**
+     * Token propio de cada prueba.
+     *
+     * Antes todas compartían `self::TOKEN`. Los dispositivos se acumulan
+     * entre pruebas —aquí no se vacía `devices`—, así que dos equipos
+     * acababan con el mismo token, que es justo lo que el índice único de
+     * `devices.api_token_hash` prohíbe y lo que nunca debería pasar en
+     * producción: el token es lo que identifica al dispositivo.
+     */
+    private string $token;
 
     private Organization $organization;
 
@@ -47,6 +58,7 @@ final class IngestReadsTest extends TestCase
         }
 
         $suffix = uniqid();
+        $this->token = self::TOKEN.'-'.$suffix;
 
         $this->organization = Organization::create([
             'name' => 'VivaTech Pruebas',
@@ -65,7 +77,7 @@ final class IngestReadsTest extends TestCase
             'kind' => 'edge',
             'regulatory_region' => 'FCC-PE',
             'status' => 'activo',
-            'api_token_hash' => Hash::make(self::TOKEN),
+            'api_token_hash' => DeviceToken::hash($this->token),
         ]);
 
         cache()->forget("epc_mask:{$this->organization->id}");
@@ -251,7 +263,7 @@ final class IngestReadsTest extends TestCase
 
     public function test_registra_el_latido_del_dispositivo(): void
     {
-        $this->withHeaders(['X-Device-Token' => self::TOKEN])
+        $this->withHeaders(['X-Device-Token' => $this->token])
             ->postJson('/api/v1/ingest/heartbeat', [
                 'device_code' => $this->device->code,
                 'reads_last_min' => 420,
@@ -335,7 +347,7 @@ final class IngestReadsTest extends TestCase
             'location_id' => $this->location->id,
             'code' => 'HH-'.uniqid(), 'name' => 'Handheld', 'kind' => 'handheld',
             'regulatory_region' => 'FCC-PE', 'status' => 'activo',
-            'api_token_hash' => Hash::make(self::TOKEN),
+            'api_token_hash' => DeviceToken::hash(Str::random(64)),
         ]);
 
         $tag = $this->stockTagForCycle();
@@ -371,7 +383,7 @@ final class IngestReadsTest extends TestCase
             'location_id' => $this->location->id,
             'code' => 'HH-'.uniqid(), 'name' => 'Handheld', 'kind' => 'handheld',
             'regulatory_region' => 'FCC-PE', 'status' => 'activo',
-            'api_token_hash' => Hash::make(self::TOKEN),
+            'api_token_hash' => DeviceToken::hash(Str::random(64)),
         ]);
 
         $tag = $this->stockTagForCycle();
@@ -411,7 +423,7 @@ final class IngestReadsTest extends TestCase
             'location_id' => $this->location->id,
             'code' => 'PORT-'.uniqid(), 'name' => 'Portal', 'kind' => 'lector_fijo',
             'regulatory_region' => 'FCC-PE', 'status' => 'activo',
-            'api_token_hash' => Hash::make(self::TOKEN),
+            'api_token_hash' => DeviceToken::hash(Str::random(64)),
         ]);
 
         $tag = $this->stockTagForCycle();
@@ -510,7 +522,7 @@ final class IngestReadsTest extends TestCase
     /** @param array<string, mixed> $payload */
     private function ingest(array $payload): TestResponse
     {
-        return $this->withHeaders(['X-Device-Token' => self::TOKEN])
+        return $this->withHeaders(['X-Device-Token' => $this->token])
             ->postJson('/api/v1/ingest/reads', $payload);
     }
 }

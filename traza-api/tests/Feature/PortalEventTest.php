@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Console\Commands\ListenPortalEvents;
+use App\Domain\Devices\DeviceToken;
 use App\Domain\Movements\MovementIntent;
 use App\Domain\Tagging\TagStateMachine;
 use App\Enums\AlertKind;
@@ -28,7 +29,6 @@ use App\Services\StockMovementService;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Hash;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
@@ -37,6 +37,9 @@ use Tests\TestCase;
 final class PortalEventTest extends TestCase
 {
     private const TOKEN = 'token-del-portal-de-prueba';
+
+    /** Token propio de cada prueba: dos dispositivos no pueden compartirlo. */
+    private string $token;
 
     private Organization $organization;
 
@@ -69,6 +72,7 @@ final class PortalEventTest extends TestCase
         $this->movements = new StockMovementService(new TagStateMachine);
 
         $suffix = uniqid();
+        $this->token = self::TOKEN.'-'.$suffix;
         $this->organization = Organization::create(['name' => 'VivaTech Pruebas']);
         $this->tienda = Location::create([
             'organization_id' => $this->organization->id,
@@ -86,7 +90,7 @@ final class PortalEventTest extends TestCase
             'kind' => 'lector_fijo',
             'regulatory_region' => 'FCC-PE',
             'status' => 'activo',
-            'api_token_hash' => Hash::make(self::TOKEN),
+            'api_token_hash' => DeviceToken::hash($this->token),
         ]);
 
         $product = Product::create([
@@ -313,7 +317,7 @@ final class PortalEventTest extends TestCase
 
         $this->withHeaders([
             'X-Device-Code' => $this->portal->code,
-            'X-Device-Token' => self::TOKEN,
+            'X-Device-Token' => $this->token,
         ])->postJson('/api/v1/ingest/portal-event', [
             'epc' => $tag->epc,
             'direction' => 'salida',
@@ -329,17 +333,21 @@ final class PortalEventTest extends TestCase
 
     public function test_un_handheld_no_puede_declarar_transitos_de_portal(): void
     {
+        // Token propio: el del portal ya está tomado y dos dispositivos no
+        // pueden compartirlo.
+        $tokenHandheld = self::TOKEN.'-hh-'.uniqid();
+
         $handheld = Device::create([
             'organization_id' => $this->organization->id,
             'location_id' => $this->tienda->id,
             'code' => 'HH-'.uniqid(), 'name' => 'Handheld', 'kind' => 'handheld',
             'regulatory_region' => 'FCC-PE', 'status' => 'activo',
-            'api_token_hash' => Hash::make(self::TOKEN),
+            'api_token_hash' => DeviceToken::hash($tokenHandheld),
         ]);
 
         $this->withHeaders([
             'X-Device-Code' => $handheld->code,
-            'X-Device-Token' => self::TOKEN,
+            'X-Device-Token' => $tokenHandheld,
         ])->postJson('/api/v1/ingest/portal-event', [
             'epc' => '3035D9000000000000000001',
             'direction' => 'salida',

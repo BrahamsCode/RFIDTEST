@@ -282,6 +282,14 @@ CREATE TABLE devices (
     CONSTRAINT devices_code_unique UNIQUE (organization_id, code)
 );
 
+-- El token es lo que identifica al dispositivo al autenticarse: el código no
+-- vale, porque es único solo dentro de la organización y dos tiendas pueden
+-- tener cada una su 'EDGE-01'. La búsqueda por hash corre en cada petición de
+-- ingesta, de ahí el índice. Único además porque dos dispositivos no pueden
+-- compartir token; los que aún no se han dado de alta tienen NULL, y en
+-- PostgreSQL un índice único admite varios NULL.
+CREATE UNIQUE INDEX devices_api_token_hash_unique ON devices (api_token_hash);
+
 CREATE TABLE device_antennas (
     id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     device_id       BIGINT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,

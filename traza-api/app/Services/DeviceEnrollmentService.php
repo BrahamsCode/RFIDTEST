@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Domain\Devices\DeviceToken;
 use App\Models\Device;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 /**
@@ -96,10 +96,10 @@ final class DeviceEnrollmentService
         // equipos se den de alta con el mismo código.
         Cache::forget($key);
 
-        $apiToken = Str::random(64);
+        $apiToken = DeviceToken::generate();
 
         $device->forceFill([
-            'api_token_hash' => Hash::make($apiToken),
+            'api_token_hash' => DeviceToken::hash($apiToken),
             'status' => 'activo',
             'last_seen_at' => now(),
         ])->save();

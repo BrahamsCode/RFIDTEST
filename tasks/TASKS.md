@@ -260,6 +260,66 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
   pendientes, y con ese único número no se puede comprobar «no se perdió
   nada» sin abrir el SQLite a mano. Fue justo lo que hizo falta aquí.
 
+#### Dos defectos de autenticación que aparecieron montando esta prueba
+
+Ninguno de los dos tiene que ver con el buffer. Salieron al dar de alta un
+segundo dispositivo para la prueba, que es la clase de cosa que no se hace
+nunca en desarrollo y se hace siempre en producción.
+
+1. **`AuthenticateDevice` buscaba el dispositivo por su código**, y el código
+   es único solo dentro de la organización (`devices_code_unique` es
+   `(organization_id, code)`). Dos tiendas pueden llamar `EDGE-01` a su borde
+   con todo el derecho; la consulta se quedaba con el primero que salía y la
+   que perdía el sorteo **veía rechazado un token perfectamente válido**. No
+   se puede reproducir con una sola tienda, así que habría aparecido el día
+   de la segunda instalación. Comprobado: con el código anterior el segundo
+   token válido devuelve 401.
+
+   Ahora el dispositivo se localiza **por el hash de su token**, que es lo
+   único que de verdad lo identifica —un secreto de 380 bits que solo tiene
+   él—. El código se sigue exigiendo como comprobación de coherencia: un
+   borde que presenta el token correcto con el código de otro está mal
+   configurado y es mejor que falle ruidosamente que atribuir lecturas a la
+   tienda equivocada durante meses.
+
+2. **El token se verificaba con bcrypt en el camino caliente de la ingesta.**
+   Medido aquí: **231 ms por comprobación**, y se hacía en cada POST de
+   lecturas. Cada borde vacía su buffer una vez por segundo, así que diez
+   tiendas son 2,3 s de CPU por segundo quemados en hashear; al límite de
+   2000/min que fija `docs/06` §6 harían falta unos ocho núcleos dedicados a
+   ello. Un token inventado costaba lo mismo, así que también era una forma
+   cómoda de tumbar la ingesta.
+
+   bcrypt es lento **a propósito**, y tiene todo el sentido para la
+   contraseña de una persona: encarece la fuerza bruta contra algo que se
+   elige mal. Un token de dispositivo no lo elige nadie —`Str::random(64)`,
+   unos 380 bits— y no hay fuerza bruta que valga contra eso ni a un billón
+   de intentos por segundo. El estiramiento de clave no aportaba seguridad,
+   solo coste. Se pasa a SHA-256 con `hash_equals`, que es además lo que ya
+   hacía `DeviceEnrollmentService` con el token de alta: el sistema se
+   contradecía consigo mismo.
+
+   Ingesta medida antes y después: **259 ms → 30 ms**.
+
+- La documentación (`docs/12` §4) solo exige que el token viaje hasheado en
+  `devices.api_token_hash`; no fija el algoritmo, así que esto no contradice
+  nada y no hacía falta parar a preguntar.
+- **Sin migración de datos ni volver a dar de alta a nadie**: los hashes
+  bcrypt existentes se siguen aceptando y se reescriben a SHA-256 la primera
+  vez que aciertan, así que cada dispositivo paga el bcrypt una vez en su
+  vida y el camino lento se apaga solo. El respaldo solo se activa si existe
+  un dispositivo con ese código y hash bcrypt, para que un token basura no
+  dispare la comprobación cara.
+- Se añade el índice **único** `devices_api_token_hash_unique`, en la
+  migración y en `sql/schema.sql` a la vez. Hace falta para que la búsqueda
+  por hash no sea un recorrido secuencial, y de paso impone en la base algo
+  que conviene que sea imposible: que dos dispositivos compartan token.
+- Los rechazos de este middleware devolvían JSON suelto en vez de RFC 7807.
+  Corregido, que es lo que fija `docs/06` §6 para el resto de la API.
+- 15 pruebas nuevas en `DeviceTokenAuthTest`. Varias pruebas antiguas
+  compartían un mismo token entre todos los dispositivos que creaban; se les
+  da uno propio a cada uno, que es lo realista y lo que el índice exige.
+
 ### 2.7 Adaptador de lector real
 - **Contexto**: `docs/07-middleware-rfid.md` §5
 - **Entregable**: `LlrpAdapter` o `HttpWebhookAdapter` según el modelo elegido en 0.1

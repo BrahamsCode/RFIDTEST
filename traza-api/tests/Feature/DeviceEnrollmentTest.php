@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Domain\Devices\DeviceToken;
 use App\Enums\RoleCode;
 use App\Models\Device;
 use App\Models\Location;
@@ -14,7 +15,6 @@ use App\Services\DeviceEnrollmentService;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
@@ -117,7 +117,10 @@ final class DeviceEnrollmentTest extends TestCase
 
         $this->handheld->refresh();
         $this->assertSame('activo', $this->handheld->status);
-        $this->assertTrue(Hash::check($apiToken, $this->handheld->api_token_hash));
+        $this->assertTrue(DeviceToken::matches($apiToken, $this->handheld->api_token_hash));
+
+        // Y no en claro: quien lea la tabla no se puede dar de alta con ella.
+        $this->assertNotSame($apiToken, $this->handheld->api_token_hash);
     }
 
     public function test_el_token_de_alta_no_se_guarda_en_claro(): void

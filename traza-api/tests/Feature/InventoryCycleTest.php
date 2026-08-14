@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Domain\Devices\DeviceToken;
 use App\Domain\Inventory\CycleReconciler;
 use App\Domain\Movements\MovementIntent;
 use App\Domain\Tagging\TagStateMachine;
@@ -33,6 +34,9 @@ final class InventoryCycleTest extends TestCase
 {
     private const TOKEN = 'token-del-handheld';
 
+    /** Token propio de cada prueba: dos dispositivos no pueden compartirlo. */
+    private string $token;
+
     private Organization $organization;
 
     private Location $location;
@@ -61,6 +65,7 @@ final class InventoryCycleTest extends TestCase
         $this->cycles = new InventoryCycleService;
 
         $suffix = uniqid();
+        $this->token = self::TOKEN.'-'.$suffix;
         $this->organization = Organization::create(['name' => 'VivaTech Pruebas']);
         $this->location = Location::create([
             'organization_id' => $this->organization->id,
@@ -85,7 +90,7 @@ final class InventoryCycleTest extends TestCase
             'kind' => 'handheld',
             'regulatory_region' => 'FCC-PE',
             'status' => 'activo',
-            'api_token_hash' => Hash::make(self::TOKEN),
+            'api_token_hash' => DeviceToken::hash($this->token),
         ]);
     }
 
@@ -263,7 +268,7 @@ final class InventoryCycleTest extends TestCase
         $tags = $this->stockTags(2);
         $cycle = $this->cycles->create($this->location, 'INV-015');
 
-        $this->withHeaders(['X-Device-Token' => self::TOKEN, 'X-Device-Code' => $this->handheld->code])
+        $this->withHeaders(['X-Device-Token' => $this->token, 'X-Device-Code' => $this->handheld->code])
             ->postJson("/api/v1/inventory-cycles/{$cycle->id}/scans", [
                 'scans' => [
                     ['epc' => $tags[0]->epc, 'rssi' => -50],
