@@ -109,7 +109,7 @@ Un error ahí corrompe identificadores de forma silenciosa e irreversible.
 | Portal antihurto: tránsitos, gracia y falsos positivos | Hecho — épica 6 |
 | `traza:listen-portal` (suscriptor MQTT) | Hecho — tarea 6.2 |
 | Dispositivos y alta por QR | Hecho — tarea 5.6 |
-| Catálogo y lotes de etiquetas | Pendiente |
+| Catálogo, lotes de etiquetas y ZPL | Hecho — tarea 4.6 |
 
 ## Endpoints
 

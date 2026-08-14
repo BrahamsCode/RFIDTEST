@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\V1\AlertController;
+use App\Http\Controllers\Api\V1\CatalogController;
 use App\Http\Controllers\Api\V1\DeviceController;
 use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\IngestController;
 use App\Http\Controllers\Api\V1\InventoryCycleController;
+use App\Http\Controllers\Api\V1\LabelBatchController;
 use App\Http\Controllers\Api\V1\MovementController;
 use App\Http\Controllers\Api\V1\PortalEventController;
 use App\Http\Controllers\Api\V1\ReceivingOrderController;
@@ -98,6 +100,22 @@ Route::prefix('v1')->group(function (): void {
         Route::post('portal-events/{portalEvent}/false-positive', [PortalEventController::class, 'falsePositive'])
             ->name('api.v1.portal.false-positive');
 
+        // Catálogo y lotes de etiquetas
+        Route::get('products', [CatalogController::class, 'index'])->name('api.v1.products.index');
+        Route::post('products', [CatalogController::class, 'store'])->name('api.v1.products.store');
+        Route::post('products/{product}/variants', [CatalogController::class, 'storeVariant'])
+            ->name('api.v1.variants.store');
+        Route::patch('variants/{variant}', [CatalogController::class, 'updateVariant'])
+            ->name('api.v1.variants.update');
+
+        Route::get('label-batches', [LabelBatchController::class, 'index'])->name('api.v1.labels.index');
+        Route::get('label-batches/{tagBatch}/zpl', [LabelBatchController::class, 'zpl'])
+            ->name('api.v1.labels.zpl');
+        Route::post('label-batches/{tagBatch}/complete', [LabelBatchController::class, 'complete'])
+            ->name('api.v1.labels.complete');
+        Route::post('label-batches/reprint', [LabelBatchController::class, 'reprint'])
+            ->name('api.v1.labels.reprint');
+
         // Dispositivos y alta por QR
         Route::get('devices', [DeviceController::class, 'index'])->name('api.v1.devices.index');
         Route::post('devices/{device}/enrollment', [DeviceController::class, 'enroll'])
@@ -122,6 +140,11 @@ Route::prefix('v1')->group(function (): void {
             Route::post('movements/zone-change', [MovementController::class, 'zoneChange'])->name('api.v1.movements.zone');
 
             Route::post('tags/{epc}/replace', [TagController::class, 'replace'])->name('api.v1.tags.replace');
+
+            // Emitir un lote consume seriales de forma irreversible: un
+            // reintento por timeout de red no puede quemar 100 EPC más.
+            Route::post('label-batches', [LabelBatchController::class, 'store'])
+                ->name('api.v1.labels.store');
         });
     });
 });

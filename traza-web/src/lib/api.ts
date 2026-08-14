@@ -391,3 +391,101 @@ export const devices = {
     await api.delete(`/api/v1/devices/${id}/enrollment`);
   },
 };
+
+// ----------------------------------------------- catálogo y etiquetas
+
+export interface Variant {
+  id: number;
+  sku: string;
+  size: string | null;
+  color: string | null;
+  color_hex: string | null;
+  barcode: string | null;
+  item_reference: string | null;
+  cost_price: string | null;
+  sale_price: string | null;
+  min_stock: number;
+  is_active: boolean;
+  serials_remaining: number;
+}
+
+export interface CatalogProduct {
+  id: number;
+  code: string;
+  name: string;
+  brand: string | null;
+  composition: string | null;
+  /** 1 fácil (algodón), 5 difícil (metálico). Explica por qué algo no se lee. */
+  rfid_difficulty: number | null;
+  is_active: boolean;
+  variants: Variant[];
+}
+
+export interface LabelBatch {
+  id: number;
+  code: string;
+  sku: string | null;
+  quantity: number;
+  serial_from: number;
+  serial_to: number;
+  printed_ok: number;
+  printed_void: number;
+  void_rate: number;
+  void_rate_exceeded: boolean;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface CreatedBatch {
+  id: number;
+  code: string;
+  sku: string;
+  quantity: number;
+  serial_from: number;
+  serial_to: number;
+  zpl_url: string;
+}
+
+export const catalog = {
+  async products(params: Record<string, unknown> = {}): Promise<Paginated<CatalogProduct>> {
+    const { data } = await api.get('/api/v1/products', { params });
+    return data;
+  },
+};
+
+export const labels = {
+  async batches(params: Record<string, unknown> = {}): Promise<Paginated<LabelBatch>> {
+    const { data } = await api.get('/api/v1/label-batches', { params });
+    return data;
+  },
+  async create(variantId: number, quantity: number): Promise<CreatedBatch> {
+    const { data } = await api.post(
+      '/api/v1/label-batches',
+      { product_variant_id: variantId, quantity },
+      // Emitir un lote consume seriales de forma irreversible: un reintento
+      // por timeout no puede quemar cien EPC más.
+      { headers: { 'Idempotency-Key': `lote-${variantId}-${quantity}-${Date.now()}` } },
+    );
+    return data;
+  },
+  async complete(id: number, printedOk: number, printedVoid: number): Promise<LabelBatch> {
+    const { data } = await api.post(`/api/v1/label-batches/${id}/complete`, {
+      printed_ok: printedOk,
+      printed_void: printedVoid,
+    });
+    return data;
+  },
+  /** Descarga del ZPL. Va como fichero: se manda al puerto 9100 de la Zebra. */
+  async downloadZpl(batchId: number, code: string): Promise<void> {
+    const { data } = await api.get(`/api/v1/label-batches/${batchId}/zpl`, {
+      responseType: 'blob',
+    });
+
+    const url = URL.createObjectURL(data as Blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${code}.zpl`;
+    link.click();
+    URL.revokeObjectURL(url);
+  },
+};

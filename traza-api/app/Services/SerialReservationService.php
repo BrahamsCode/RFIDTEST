@@ -61,6 +61,26 @@ final class SerialReservationService
         return $epcs;
     }
 
+    /**
+     * Codifica un rango ya reservado. Separado de `reserveEpcs()` porque un
+     * lote necesita guardar el rango en `tag_batches` y los EPC en `tags`, y
+     * volver a reservar para obtener los EPC consumiría el doble de seriales.
+     *
+     * @return list<string>
+     */
+    public function encodeRange(ProductVariant $variant, SerialRange $range, ?string $scheme = null): array
+    {
+        $codec = $scheme === null ? $this->codecs->default() : $this->codecs->for($scheme);
+        [$prefix, $reference] = $this->identityFor($variant, $codec->scheme());
+
+        $epcs = [];
+        foreach ($range as $serial) {
+            $epcs[] = $codec->encode($prefix, $reference, $serial);
+        }
+
+        return $epcs;
+    }
+
     /** Cuántos seriales quedan libres para esta variante. */
     public function remaining(ProductVariant $variant): int
     {

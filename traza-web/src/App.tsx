@@ -6,6 +6,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Alerts } from './pages/Alerts';
 import { Portal } from './pages/Portal';
 import { Devices } from './pages/Devices';
+import { Labels } from './pages/Labels';
 import { CycleList } from './pages/inventory/CycleList';
 import { CycleLive } from './pages/inventory/CycleLive';
 import { StockList } from './pages/stock/StockList';
@@ -39,6 +40,7 @@ export default function App() {
             <Route path="alertas" element={<Alerts />} />
             <Route path="portal" element={<Portal />} />
             <Route path="dispositivos" element={<Devices />} />
+            <Route path="etiquetas" element={<Labels />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

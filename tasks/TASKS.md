@@ -378,7 +378,30 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 ### 4.6 Catálogo y lotes de etiquetas
 - **Entregable**: CRUD de productos y variantes; generación de lotes con reserva de seriales y descarga de ZPL
 - **Aceptación**: un lote de 100 etiquetas genera ZPL válido con EPC correctos
-- [ ]
+- [x] `LabelBatchService` + `ZplRenderer`, catálogo en `/api/v1/products` y
+      pantalla `/etiquetas`. **Un lote de 100 se prueba entero**: 100 EPC
+      correlativos, los 100 decodifican al prefijo y la referencia correctos, y
+      el ZPL lleva 100 bloques `^RFW,H,1,12,1` más el `^RQ` de resultado.
+
+      Usa la tabla `tag_batches` que ya estaba en el esquema —con
+      `printed_ok`/`printed_void` para la tasa de inlays fallidos de
+      `docs/04` §5—, así que no hace falta tocar el modelo de datos.
+
+      Decisiones que conviene conocer:
+      - Los tags nacen en `creado` **antes** de imprimir. Al revés, un corte
+        de luz a mitad de rollo dejaría etiquetas físicas con EPC que el
+        sistema no conoce, y esas prendas serían invisibles al inventario.
+      - `item_reference` no se puede editar una vez creada la variante: va
+        dentro del EPC de cada etiqueta ya impresa, y cambiarla haría que esas
+        prendas se decodificaran como otra variante, en silencio.
+      - `^` y `~` se neutralizan en los textos. Un producto llamado
+        «CAMISA ~ OFERTA» partiría la etiqueta en dos comandos ZPL.
+      - Hay reimpresión por EPC concreto: si la impresora se atasca a mitad de
+        rollo, volver a emitir el lote duplicaría el inventario de la variante.
+
+      **Sin impresora real**: el ZPL está verificado como texto contra los
+      comandos de `docs/04` §5, no impreso en una Zebra. Eso llega con el
+      hardware (tarea 0.1).
 
 ### 4.7 Panel de tienda
 - **Contexto**: `docs/13-kpis-y-analitica.md` §3.1
