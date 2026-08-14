@@ -13,6 +13,7 @@ use App\Services\SaleService;
 use App\Services\TagReplacementService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 final class TagController extends Controller
@@ -46,6 +47,76 @@ final class TagController extends Controller
     }
 
     /** Trazabilidad completa: el histórico es `stock_movements`, sin excepción. */
+    /**
+     * Detecciones recientes con su RSSI. Tarea 4.4.
+     *
+     * Es lo primero que mira soporte cuando alguien dice «el sistema dice que
+     * está y no está». Un RSSI consistentemente bajo —en torno a −75 dBm—
+     * significa que se está leyendo desde la tienda de al lado o desde otra
+     * zona, no que la prenda esté donde el sistema cree.
+     */
+    public function detections(Request $request, string $epc): JsonResponse
+    {
+        $tag = Tag::query()->where('epc', strtoupper($epc))->first();
+
+        if ($tag === null) {
+            return Problem::make(404, 'Prenda no encontrada', "No existe el EPC {$epc}.");
+        }
+
+        $hours = min(max($request->integer('hours', 72), 1), 720);
+
+        /*
+         * Se agrupa por hora y antena en SQL. Traer las lecturas crudas sería
+         * devolver decenas de miles de puntos que el navegador no puede
+         * dibujar y que además no dicen nada: lo que interesa es la tendencia
+         * y la dispersión, no cada lectura.
+         *
+         * El filtro por `read_at` recorta particiones: sin él la consulta
+         * barrería los tres meses de retención.
+         */
+        $rows = DB::select(<<<'SQL'
+            SELECT date_trunc('hour', r.read_at)        AS hora,
+                   r.device_id,
+                   d.code                               AS dispositivo,
+                   r.antenna_port                       AS antena,
+                   count(*)                             AS lecturas,
+                   round(avg(r.rssi), 1)                AS rssi_medio,
+                   min(r.rssi)                          AS rssi_min,
+                   max(r.rssi)                          AS rssi_max
+            FROM tag_reads r
+            LEFT JOIN devices d ON d.id = r.device_id
+            WHERE r.epc = ?
+              AND r.read_at >= now() - (? * interval '1 hour')
+            GROUP BY 1, 2, 3, 4
+            ORDER BY 1
+        SQL, [$tag->epc, $hours]);
+
+        $rssi = array_map(fn (object $r) => (float) $r->rssi_medio, $rows);
+
+        return response()->json([
+            'epc' => $tag->epc,
+            'hours' => $hours,
+            'data' => array_map(fn (object $r) => [
+                'hour' => $r->hora,
+                'device_id' => $r->device_id,
+                'device_code' => $r->dispositivo,
+                'antenna' => $r->antena,
+                'reads' => (int) $r->lecturas,
+                'rssi_avg' => (float) $r->rssi_medio,
+                'rssi_min' => (float) $r->rssi_min,
+                'rssi_max' => (float) $r->rssi_max,
+            ], $rows),
+            'summary' => [
+                'total_reads' => array_sum(array_map(fn (object $r) => (int) $r->lecturas, $rows)),
+                'rssi_avg' => $rssi === [] ? null : round(array_sum($rssi) / count($rssi), 1),
+                'rssi_min' => $rssi === [] ? null : min($rssi),
+                // Por debajo de −70 dBm la lectura es de lejos: probablemente
+                // del local vecino, no de donde el sistema cree que está.
+                'weak_signal' => $rssi !== [] && (array_sum($rssi) / count($rssi)) < -70,
+            ],
+        ]);
+    }
+
     public function history(Request $request, string $epc): JsonResponse
     {
         $tag = $this->findOrFail($epc);

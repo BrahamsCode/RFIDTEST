@@ -153,6 +153,30 @@ final class BroadcastingTest extends TestCase
         $this->assertSame('private-location.7.alerts', $channel->name);
     }
 
+    public function test_los_eventos_viajan_con_el_nombre_que_escucha_la_web(): void
+    {
+        /*
+         * Sin `broadcastAs()`, Laravel emite el nombre completo de la clase
+         * —`App\Events\InventoryCycleProgressed`— y los hooks de la web
+         * escuchan `.InventoryCycleProgressed`. El punto delante significa
+         * «este nombre tal cual», así que no coinciden: el evento llega al
+         * navegador y el manejador no se ejecuta nunca. La pantalla se queda
+         * quieta y no hay ningún error a la vista.
+         *
+         * Se descubrió midiendo el retardo contra un Reverb real, no aquí:
+         * esta prueba existe para que no vuelva a pasar.
+         */
+        $this->assertSame(
+            'InventoryCycleProgressed',
+            (new InventoryCycleProgressed(cycleId: 1, scanned: 1, expected: 2))->broadcastAs(),
+        );
+
+        $this->assertSame(
+            'PortalAlarmRaised',
+            (new PortalAlarmRaised(locationId: 1, epc: 'AABB', confidence: 0.9))->broadcastAs(),
+        );
+    }
+
     // ------------------------------------------ autorización de canales
 
     public function test_un_usuario_de_tienda_escucha_el_ciclo_de_su_tienda(): void

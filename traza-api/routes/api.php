@@ -77,6 +77,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('tags', [TagController::class, 'index'])->name('api.v1.tags.index');
         Route::get('tags/{epc}', [TagController::class, 'show'])->name('api.v1.tags.show');
         Route::get('tags/{epc}/history', [TagController::class, 'history'])->name('api.v1.tags.history');
+        Route::get('tags/{epc}/detections', [TagController::class, 'detections'])->name('api.v1.tags.detections');
 
         // Inventario
         Route::get('inventory-cycles', [InventoryCycleController::class, 'index'])->name('api.v1.cycles.index');

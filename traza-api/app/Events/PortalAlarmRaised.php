@@ -32,6 +32,23 @@ final class PortalAlarmRaised implements ShouldBroadcastNow
         public readonly ?string $productName = null,
     ) {}
 
+    /**
+     * Nombre con el que viaja el evento.
+     *
+     * Sin esto Laravel emite el nombre completo de la clase
+     * (`App\Events\PortalAlarmRaised`), y el cliente escucha
+     * `.PortalAlarmRaised` —el punto delante significa «nombre tal cual,
+     * sin anteponer espacio de nombres»—. No coinciden, así que el evento
+     * llega al navegador y el manejador nunca se ejecuta: la pantalla se
+     * queda quieta sin ningún error a la vista.
+     *
+     * Se descubrió midiendo el retardo con un Reverb real.
+     */
+    public function broadcastAs(): string
+    {
+        return 'PortalAlarmRaised';
+    }
+
     public function broadcastOn(): Channel
     {
         return new PrivateChannel("location.{$this->locationId}.alerts");

@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { tags, type Movement } from '../../lib/api';
 import { formatEpc } from '../../lib/format';
 import { TagStateBadge } from '../../components/TagStateBadge';
+import { RssiChart } from '../../components/RssiChart';
 import { Card, EmptyState, ErrorState, PageShell, Spinner } from '../../components/ui';
 
 const MOVEMENT_LABELS: Record<string, string> = {
@@ -73,6 +74,10 @@ export function TagDetail() {
             </dl>
           </Card>
         )}
+
+        <Card title="Señal de las últimas 72 h">
+          <RssiChart epc={epc} />
+        </Card>
 
         <Card title="Historial">
           {history === undefined ? (

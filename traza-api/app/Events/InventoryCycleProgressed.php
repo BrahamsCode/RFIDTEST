@@ -30,6 +30,23 @@ final class InventoryCycleProgressed implements ShouldBroadcast
         public readonly ?int $zoneId = null,
     ) {}
 
+    /**
+     * Nombre con el que viaja el evento.
+     *
+     * Sin esto Laravel emite el nombre completo de la clase
+     * (`App\Events\InventoryCycleProgressed`), y el cliente escucha
+     * `.InventoryCycleProgressed` —el punto delante significa «nombre tal cual,
+     * sin anteponer espacio de nombres»—. No coinciden, así que el evento
+     * llega al navegador y el manejador nunca se ejecuta: la pantalla se
+     * queda quieta sin ningún error a la vista.
+     *
+     * Se descubrió midiendo el retardo con un Reverb real.
+     */
+    public function broadcastAs(): string
+    {
+        return 'InventoryCycleProgressed';
+    }
+
     public function broadcastOn(): Channel
     {
         return new PrivateChannel("inventory-cycle.{$this->cycleId}");

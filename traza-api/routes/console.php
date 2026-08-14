@@ -42,3 +42,23 @@ Schedule::command('traza:export-cold-reads')
     ->timezone('America/Lima')
     ->onOneServer()
     ->emailOutputOnFailure(config('traza.ops.email'));
+
+/*
+ * Informes de auditoría de `docs/12` §6.
+ *
+ * El de accesos fuera de horario es semanal y levanta alerta; los mensuales
+ * solo informan por correo. Convertir en alerta un informe mensual que casi
+ * siempre tiene filas haría que se acabara silenciando, y con él los que sí
+ * importan.
+ */
+Schedule::command('traza:audit-report accesos --days=7')
+    ->weeklyOn(1, '06:00')
+    ->timezone('America/Lima')
+    ->onOneServer()
+    ->emailOutputTo(config('traza.ops.email'));
+
+Schedule::command('traza:audit-report todos --days=31')
+    ->monthlyOn(1, '06:30')
+    ->timezone('America/Lima')
+    ->onOneServer()
+    ->emailOutputTo(config('traza.ops.email'));

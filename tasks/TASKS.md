@@ -227,8 +227,38 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 - **Contexto**: `docs/07-middleware-rfid.md` §7
 - **Entregable**: `SqliteBuffer` con WAL, `Flusher` con retroceso exponencial
 - **Aceptación**: escenario `red_caida` → 0 lecturas perdidas en 10 min sin API
-- [~] Implementado y probado contra la API real: 763 lecturas retenidas ante
-  404 con retroceso exponencial, sin pérdida. Falta la prueba larga de 10 min.
+- [x] **Escenario `red_caida` completo, 10 min con la API inalcanzable y
+  después reconexión, con la contabilidad cuadrando a la lectura.**
+
+  | | |
+  |---|---|
+  | Duración sin API | 612 s (3 000 prendas simuladas) |
+  | Aceptadas por el pipeline | 53 910 |
+  | Retenidas en SQLite | 53 910 |
+  | Descartadas | **0** |
+  | Filas en `tag_reads` tras reconectar | 54 009 |
+  | EPC distintos | 3 000 = la población entera |
+
+  Las 54 009 son las 53 910 del corte más las 99 que generó el borde ya
+  reconectado: **no se perdió ni una**. El retroceso exponencial llegó a su
+  techo de 60 s y se mantuvo ahí (14 intentos en 10 min en vez de 600).
+
+- **La prueba de verdad es la reconexión, no el buffer.** Que el contador
+  `buffer_depth` suba durante el corte solo demuestra que las filas se
+  escriben; no demuestra que se puedan leer, ni que el formato siga siendo
+  válido, ni que el lote se acepte. Por eso el borde se **mató con SIGTERM**,
+  se levantó de nuevo apuntando a una API real **con el mismo fichero
+  SQLite**, y se comprobó que las 53 910 acaban en `tag_reads`. Así se cubre
+  también la durabilidad entre reinicios, que es el caso realista: en una
+  tienda de Gamarra el corte de luz y el corte de red son el mismo suceso.
+- `take()` no borra: las filas salen del buffer solo con el `ack()` posterior
+  a un POST correcto. Es lo que hace que un fallo a mitad de envío no pueda
+  perder nada, y por eso un lote reintentado duplica antes que perder —el
+  orden correcto de preferencias para un inventario—.
+- **El apagado ahora deja el balance por escrito**: `aceptadas`, `enviadas`,
+  `pendientes` y `descartadas por límite`. Antes solo registraba las
+  pendientes, y con ese único número no se puede comprobar «no se perdió
+  nada» sin abrir el SQLite a mano. Fue justo lo que hizo falta aquí.
 
 ### 2.7 Adaptador de lector real
 - **Contexto**: `docs/07-middleware-rfid.md` §5
@@ -311,14 +341,24 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 - **Contexto**: `docs/06-backend-laravel.md` §8
 - **Entregable**: evento `InventoryCycleProgressed` sobre Reverb
 - **Aceptación**: la web refleja el avance con menos de 3 s de retardo
-- [~] `InventoryCycleProgressed` y `PortalAlarmRaised` con sus canales
+- [x] `InventoryCycleProgressed` y `PortalAlarmRaised` con sus canales
   privados y autorización por tienda, más el hook `useCycleProgress` en la
   web. Se difunde **un evento por lote**, no uno por EPC: en un barrido de
   20 000 prendas serían 20 000 eventos.
 - Si `VITE_REVERB_KEY` no está configurada, la web cae al sondeo de 5 s en
   vez de romperse. Con Reverb activo el respaldo baja a 60 s.
-- **Falta medir el retardo real con un servidor Reverb en marcha**: aquí no
-  hay ninguno levantado.
+- **Medido contra un Reverb real** (`php artisan reverb:start --port=8085`)
+  con `traza-web/perf/reverb-latencia.mjs`, que se suscribe al canal privado
+  firmando el `socket_id` con HMAC igual que hace el navegador:
+  **retardo por debajo de 1 ms** en local, frente al criterio de 3 s.
+- **La medición encontró un fallo que ninguna prueba unitaria veía**: ninguno
+  de los dos eventos definía `broadcastAs()`. Sin él el servidor emite
+  `App\Events\InventoryCycleProgressed` (con el espacio de nombres) mientras
+  Echo escucha `InventoryCycleProgressed`. El evento sale, llega al canal, y
+  el navegador lo ignora en silencio: no hay excepción, ni log, ni nada que
+  mirar. La web habría caído para siempre al sondeo de respaldo y habría
+  parecido que «Reverb va lento». Añadido `broadcastAs()` a los dos, con
+  prueba de regresión en `BroadcastingTest`.
 - **Aviso sobre `routes/channels.php`**: los parámetros del canal llegan como
   **cadena**. Tiparlos como `int` con `declare(strict_types=1)` provoca un
   TypeError que Laravel convierte en denegación silenciosa, sin error visible
@@ -350,39 +390,69 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 - **Contexto**: `docs/08-frontend-react.md` §4
 - **Entregable**: pantalla con progreso, desglose por zona, `SlowZoneHint`, hook `useCycleProgress`
 - **Aceptación**: con el simulador corriendo, la pantalla avanza en tiempo real y avisa de la zona lenta
-- [~] Progreso, desglose por zona y `SlowZoneHint`, con 5 pruebas. Verificado
+- [x] Progreso, desglose por zona y `SlowZoneHint`, con 5 pruebas. Verificado
   con datos reales: con la sala al 95 % y la trastienda al 0 %, el aviso
   nombra la trastienda.
 - Usa `useCycleProgress` sobre Reverb (tarea 3.4), con sondeo de respaldo.
-- **Falta comprobar el avance en tiempo real con el simulador y un servidor
-  Reverb en marcha.**
+- **Comprobado con Reverb en marcha**: el evento emitido por el servidor llega
+  al suscriptor del canal privado en menos de 1 ms. Es la misma medición que
+  cierra 3.4, y es la que destapó el `broadcastAs()` que faltaba —sin él esta
+  pantalla se habría quedado avanzando por sondeo cada 60 s y nadie habría
+  sabido por qué—.
 
 ### 4.3 Stock y reposición
 - **Entregable**: listados de stock, valorización, antigüedad y reposición sobre las vistas SQL
 - **Aceptación**: p95 < 200 ms con 50 000 tags en la base
-- [~] Pantalla y endpoints (`/stock`, `/valuation`, `/aging`,
+- [x] Pantalla y endpoints (`/stock`, `/valuation`, `/aging`,
   `/replenishment`, `/summary`) sobre las vistas de la tarea 8.1, con 7
   pruebas.
-- **Falta la medición de p95 con 50 000 tags.**
+- **Medido con 51 107 tags** en la base, 320 peticiones autenticadas contra
+  los cinco endpoints. El peor p95 fue **33,0 ms**, seis veces por debajo del
+  presupuesto de 200 ms. La única respuesta no-200 fue del limitador de
+  ritmo, comprobado aparte: exactamente 300 × HTTP 200 y 20 × HTTP 429, que
+  es justo lo que dice `docs/06` §6.
+- Detalles del montaje de datos que costaron un rato: el `check` de
+  `tags_epc_hex` exige mayúsculas (`upper()`), y `random() * 300 || ' days'`
+  genera notación científica que PostgreSQL no acepta como intervalo
+  (`round(...)::int * interval '1 day'`). El disparador de solo-anexado
+  impide limpiar la tabla después, así que la medición se hace sobre
+  `migrate:fresh`.
 
 ### 4.4 Ficha de prenda
 - **Contexto**: `docs/08-frontend-react.md` §5
 - **Entregable**: ficha con estado, ubicación, historial completo y gráfico de RSSI
 - **Aceptación**: el historial coincide exactamente con `stock_movements`
-- [~] Ficha con estado, ubicación, datos de la venta e historial completo.
+- [x] Ficha con estado, ubicación, datos de la venta e historial completo.
   El endpoint ya tenía prueba de que el historial cuadra con
   `stock_movements`.
-- **Falta el gráfico de RSSI**, que necesita un endpoint de detecciones
-  recientes sobre `tag_reads`.
+- **Gráfico de RSSI cerrado**: `GET /api/v1/tags/{epc}/detections` agrega
+  `tag_reads` por hora, dispositivo y antena, y `RssiChart.tsx` lo dibuja con
+  recharts sobre un eje fijo de −90 a −30 dBm. 9 pruebas.
+- Se agrega y no se devuelven las lecturas crudas: tres meses de retención son
+  decenas de miles de puntos que el navegador no dibuja y que además no dicen
+  nada. La ventana tiene tope de 720 h, que es lo que recorta particiones.
+- **Lo que de verdad aporta el gráfico es el aviso de señal débil.** Un RSSI
+  plano en torno a −75 dBm no prueba que la prenda esté donde el sistema dice;
+  prueba que se lee de lejos, y en Gamarra eso normalmente significa desde el
+  local de al lado. Sin el aviso, soporte mira la gráfica y concluye lo
+  contrario: «sí aparece, luego está ahí».
 
 ### 4.5 Tabla virtualizada de tags
 - **Contexto**: `docs/08-frontend-react.md` §6
 - **Entregable**: `TagTable` con `useVirtualizer` + `useInfiniteQuery`
 - **Aceptación**: 20 000 filas se desplazan a 60 fps
-- [~] `TagTable` con `useVirtualizer` y `useInfiniteQuery`, cargando la
+- [x] `TagTable` con `useVirtualizer` y `useInfiniteQuery`, cargando la
   página siguiente al acercarse al final.
-- **Falta medir los 60 fps con 20 000 filas**: exige un navegador real, no
-  jsdom.
+- **Medido en Chromium de verdad** con `traza-web/perf/tagtable-fps.mjs`
+  sobre la compilación de producción: 20 000 filas cargadas, 879 488 de
+  880 000 px recorridos, 299 fotogramas, p95 de 16,7 ms = **59,9 fps**, **0
+  fotogramas perdidos** y 24 filas en el DOM. jsdom no vale para esto: no
+  compone, no pinta y no tiene fotogramas.
+- **La primera medición era falsa y daba mejor resultado.** El script
+  empezaba a desplazarse de inmediato, así que recorría las ~1 200 filas que
+  había cargadas y no las 20 000: medía la tabla en su caso fácil. Ahora
+  fuerza la carga completa antes de cronometrar. La medición cómoda es la que
+  hay que desconfiar.
 
 ### 4.6 Catálogo y lotes de etiquetas
 - **Entregable**: CRUD de productos y variantes; generación de lotes con reserva de seriales y descarga de ZPL
@@ -753,12 +823,28 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 ### 9.2 Auditoría
 - **Entregable**: `AuditObserver` sobre los modelos sensibles + informes periódicos
 - **Aceptación**: todo ajuste manual queda registrado con usuario, dispositivo e IP
-- [~] `AuditObserver` sobre tags, ciclos, dispositivos, usuarios, organización
+- [x] `AuditObserver` sobre tags, ciclos, dispositivos, usuarios, organización
   y variantes, con usuario, dispositivo, IP y agente. Omite contraseñas y
   hashes de token. Ignora los cambios que solo tocan `updated_at`.
 - `stock_movements` no lleva observador porque **es** su propia auditoría: el
   trigger de la base impide reescribirlo.
-- **Faltan los informes periódicos.**
+- **Informes periódicos cerrados**: `AuditReportService` con los cuatro de
+  `docs/12` §6 (ajustes manuales, mermas, cambios de dispositivo y accesos
+  fuera de horario), el comando `traza:audit-report` y su programación en
+  `routes/console.php`. 11 pruebas.
+- **Los informes no devuelven un total, devuelven la desviación respecto al
+  equipo.** «Ana hizo 30 ajustes negativos» no dice nada: puede ser la tienda
+  con más rotación. Lo que se marca es quien **triplica la mediana** de sus
+  compañeros, que es el patrón del fraude interno —cada ajuste por separado
+  parece razonable, el conjunto no—.
+- **Mediana y no media, a propósito.** Con la media, la persona con cien
+  ajustes arrastra el umbral hasta que ella misma parece normal. Hay una
+  prueba dedicada a esa diferencia.
+- **Solo el informe de accesos levanta alerta**, y con severidad 4. Los
+  mensuales casi siempre tienen filas; convertirlos en alerta haría que se
+  acabaran silenciando, y con ellos los que sí importan. Un acceso a las tres
+  de la mañana tampoco prueba nada por sí solo —hay quien cuadra inventario de
+  noche—, pero es lo primero que se mira cuando aparece un descuadre.
 
 ### 9.3 Access password derivado
 - **Contexto**: `docs/12-seguridad-y-privacidad.md` §3

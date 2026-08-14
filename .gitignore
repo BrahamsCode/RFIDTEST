@@ -16,4 +16,5 @@ build/
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
+dump.rdb
 .DS_Store

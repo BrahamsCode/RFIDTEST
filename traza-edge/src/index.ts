@@ -196,12 +196,26 @@ async function main(): Promise<void> {
       new Promise((r) => setTimeout(r, 5000)),
     ]);
 
-    // 4. Cerrar recursos.
+    /*
+     * 4. Cerrar recursos, dejando por escrito el balance de la sesión.
+     *
+     * Se registran las tres cifras y no solo las pendientes porque es lo
+     * único que permite comprobar «no se perdió ninguna lectura» leyendo el
+     * log, sin tener que hurgar en el SQLite. Durante un corte de red,
+     * `aceptadas = enviadas + pendientes + descartadas` tiene que cuadrar
+     * exactamente; si no cuadra, hay una fuga y conviene enterarse en el
+     * apagado y no tres semanas después con un descuadre de inventario.
+     */
     const remaining = buffer.depth();
+    const accepted = pipeline.snapshot().passed ?? 0;
+    const dropped = buffer.dropped();
     metrics.close();
     buffer.close();
     await (mqtt as { endAsync?: () => Promise<void> } | undefined)?.endAsync?.();
-    console.log(`[edge] Cerrado. Pendientes en buffer: ${remaining}`);
+    console.log(
+      `[edge] Cerrado. Aceptadas: ${accepted} · enviadas: ${accepted - remaining - dropped}`
+        + ` · pendientes en buffer: ${remaining} · descartadas por límite: ${dropped}`,
+    );
     process.exit(0);
   };
 

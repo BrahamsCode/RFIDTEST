@@ -194,6 +194,30 @@ export interface Movement {
   occurred_at: string;
 }
 
+export interface Detection {
+  hour: string;
+  device_id: number | null;
+  device_code: string | null;
+  antenna: number | null;
+  reads: number;
+  rssi_avg: number;
+  rssi_min: number;
+  rssi_max: number;
+}
+
+export interface Detections {
+  epc: string;
+  hours: number;
+  data: Detection[];
+  summary: {
+    total_reads: number;
+    rssi_avg: number | null;
+    rssi_min: number | null;
+    /** RSSI medio por debajo de −70 dBm: se está leyendo de lejos. */
+    weak_signal: boolean;
+  };
+}
+
 export const tags = {
   async list(filters: TagFilters): Promise<Paginated<Tag>> {
     const { data } = await api.get('/api/v1/tags', { params: filters });
@@ -205,6 +229,10 @@ export const tags = {
   },
   async history(epc: string, page = 1): Promise<Paginated<Movement>> {
     const { data } = await api.get(`/api/v1/tags/${epc}/history`, { params: { page } });
+    return data;
+  },
+  async detections(epc: string, hours = 72): Promise<Detections> {
+    const { data } = await api.get(`/api/v1/tags/${epc}/detections`, { params: { hours } });
     return data;
   },
 };
