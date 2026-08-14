@@ -23,3 +23,8 @@ scrape_configs:
     static_configs:
       - targets: ['edge:9100']
         labels: { tienda: LIM-01 }
+
+  - job_name: traza-api
+    metrics_path: /api/v1/metrics
+    static_configs:
+      - targets: ['api:8000']

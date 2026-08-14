@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\IngestController;
 use App\Http\Controllers\Api\V1\InventoryCycleController;
 use App\Http\Controllers\Api\V1\LabelBatchController;
+use App\Http\Controllers\Api\V1\MetricsController;
 use App\Http\Controllers\Api\V1\MovementController;
 use App\Http\Controllers\Api\V1\PortalEventController;
 use App\Http\Controllers\Api\V1\ReceivingOrderController;
@@ -27,6 +28,14 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
     Route::get('health', HealthController::class)->name('api.v1.health');
+
+    /*
+     * Métricas de `docs/11` §7. Sin sesión: Prometheus no la tiene, y la
+     * alternativa —un token más que rotar— no compensa para datos que son
+     * contadores agregados. En producción el acceso se limita en el nginx,
+     * que es donde está la topología de red.
+     */
+    Route::get('metrics', MetricsController::class)->name('api.v1.metrics');
 
     /*
      * Canje del QR de alta (`docs/09` §10). Es la única ruta sin

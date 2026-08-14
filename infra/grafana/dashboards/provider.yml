@@ -1,0 +1,13 @@
+apiVersion: 1
+
+providers:
+  - name: TRAZA
+    folder: TRAZA
+    type: file
+    disableDeletion: false
+    # Los tableros se versionan en el repositorio: editarlos desde la interfaz
+    # de Grafana y no exportarlos es cómo se pierden.
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false

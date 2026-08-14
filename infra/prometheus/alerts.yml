@@ -50,19 +50,23 @@ groups:
       # La métrica más útil del sistema, según `docs/07` §9. Si sube de
       # golpe, o el vecino instaló RFID, o entró mercadería sin tarar. Las dos
       # cosas hay que saberlas el mismo día.
+      # `ignoring(stage)` no es opcional: los dos lados llevan una etiqueta
+      # `stage` distinta, y sin ignorarla Prometheus no empareja nada y la
+      # regla no dispara jamás. Se descubrió provocándola.
       - alert: SubidaDeEpcAjenos
         expr: >
           rate(traza_edge_reads_dropped_total{stage="epc_mask"}[15m])
-            > 3 * rate(traza_edge_reads_total{stage="passed"}[15m])
+            > ignoring(stage) 3 * rate(traza_edge_reads_total{stage="passed"}[15m])
         for: 20m
         labels: { severity: media }
         annotations:
           summary: 'En {{ $labels.tienda }} se descartan más EPC ajenos que propios'
 
+      # Mismo caso que arriba con la etiqueta `direction`.
       - alert: PortalSinClasificar
         expr: >
           rate(traza_edge_portal_events_total{direction="indeterminado"}[1h])
-            > rate(traza_edge_portal_events_total{direction="salida"}[1h])
+            > ignoring(direction) rate(traza_edge_portal_events_total{direction="salida"}[1h])
         for: 1h
         labels: { severity: media }
         annotations:
@@ -98,3 +102,42 @@ groups:
           description: >
             Un volcado que encoge de golpe suele ser un `pg_dump` que se cortó
             a mitad. Pasa la verificación de `pg_restore --list` igual.
+
+  - name: traza-api
+    rules:
+      # El suscriptor de portal caído deja la tienda sin antihurto, y nadie
+      # lo nota hasta que roban algo. Es la alerta más importante del grupo.
+      - alert: EscuchaPortalCaido
+        expr: traza_portal_listener_alive == 0
+        for: 2m
+        labels: { severity: critica }
+        annotations:
+          summary: 'El suscriptor de portal no da señales de vida'
+          runbook: 'docs/11-infraestructura-docker.md#9-manual-de-incidencias'
+
+      # Cualquier valor distinto de cero significa que hay un camino de código
+      # que muta `tags` sin pasar por StockMovementService. No lleva `for`:
+      # esto no se espera a ver si se arregla solo.
+      - alert: DiscrepanciaProyeccionMovimientos
+        expr: traza_stock_projection_mismatch > 0
+        labels: { severity: critica }
+        annotations:
+          summary: 'El stock proyectado no coincide con los movimientos ({{ $value }} unidades)'
+          runbook: 'docs/05-modelo-de-datos.md#6-control-de-integridad-nocturno'
+
+      - alert: ParticionDefaultConDatos
+        expr: traza_tag_reads_default_rows > 0
+        for: 1h
+        labels: { severity: alta }
+        annotations:
+          summary: 'Hay filas en tag_reads_default: la rotación de particiones falló'
+          description: >
+            Esas lecturas no se pierden, pero quedan fuera del esquema de
+            retención: la purga no las va a tocar nunca.
+
+      - alert: ColaDeLecturasAtascada
+        expr: traza_queue_depth{queue="reads"} > 5000
+        for: 5m
+        labels: { severity: alta }
+        annotations:
+          summary: 'La cola de lecturas acumula {{ $value }} trabajos'

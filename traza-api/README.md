@@ -129,6 +129,7 @@ Superficie de `docs/06` §6. `php artisan route:list --path=api/v1` da la lista 
 | Ruta | Qué hace |
 |---|---|
 | `POST /api/v1/devices/enroll` | Canje del QR de alta. Token de un solo uso, 15 min, 10 intentos/min |
+| `GET /api/v1/metrics` | Métricas Prometheus de `docs/11` §7. En producción se limita en el nginx |
 
 **Sesión de usuario** (Sanctum): tags y su historial, ciclos de inventario
 (crear, arrancar, pausar, cerrar, informe, avance por zona), movimientos y

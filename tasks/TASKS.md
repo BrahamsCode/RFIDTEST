@@ -662,7 +662,36 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 - **Contexto**: `docs/11-infraestructura-docker.md` §7
 - **Entregable**: Prometheus, Grafana, Loki, reglas de alerta, 3 tableros
 - **Aceptación**: cada alerta de §7 se ha provocado deliberadamente al menos una vez y ha llegado
-- [ ]
+- [x] **Las 12 reglas provocadas una a una y verificadas en estado `firing`**
+      contra un Prometheus 3.1 real. Las cuatro del API se provocaron sobre la
+      base de verdad: se rompió la proyección (7 unidades), se metió una fila
+      en `tag_reads_default`, se encolaron 6 001 trabajos en Redis y se dejó el
+      suscriptor de portal parado. Las del borde y las de respaldo, sirviendo
+      las métricas correspondientes desde un endpoint de prueba — lo que se
+      comprueba ahí es la expresión de la regla, que es donde estaba el fallo.
+
+      **Y había un fallo, en dos reglas mías.** `SubidaDeEpcAjenos` y
+      `PortalSinClasificar` comparan dos series con etiquetas distintas
+      (`stage`, `direction`). Prometheus empareja por conjunto de etiquetas, no
+      encontraba pareja, y devolvía vector vacío: **no habrían disparado
+      nunca**. Corregido con `ignoring(...)`. Es exactamente el motivo por el
+      que el criterio de aceptación pide provocarlas.
+
+      Se añade `GET /api/v1/metrics` en el API con las cuatro series que las
+      alertas del documento daban por existentes y no existían
+      (`traza_portal_listener_alive`, `traza_tag_reads_default_rows`,
+      `traza_stock_projection_mismatch`, profundidad de colas). Las consultas
+      caras van con caché de 55 s: Prometheus sondea cada 30 s y la
+      comprobación de discrepancia recorre `stock_movements` entero.
+
+      Tres tableros de Grafana provisionados desde el repositorio, con las
+      **21 consultas verificadas** contra Prometheus: ninguna con error de
+      sintaxis y todas devolviendo datos.
+
+      Queda fuera: **Loki**. El servicio está en el compose de producción pero
+      no hay emisión de log estructurado con `trace_id` propagado desde el
+      borde, que es lo que pide `docs/11` §7 y lo que de verdad sirve para
+      seguir una lectura concreta desde la antena hasta la base.
 
 ### 8.6 Respaldos y restauración
 - **Contexto**: `docs/11-infraestructura-docker.md` §6

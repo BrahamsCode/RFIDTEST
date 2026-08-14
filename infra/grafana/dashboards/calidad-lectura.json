@@ -1,0 +1,165 @@
+{
+  "uid": "traza-calidad",
+  "title": "TRAZA · Calidad de lectura",
+  "description": "Para el responsable técnico. La cifra que manda es el descarte por máscara EPC: si sube de golpe, o el vecino instaló RFID, o entró mercadería sin tarar. Las dos cosas hay que saberlas el mismo día.",
+  "tags": [
+    "traza",
+    "rfid"
+  ],
+  "timezone": "America/Lima",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Descartes por etapa del pipeline",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "rate(traza_edge_reads_dropped_total[5m])",
+          "legendFormat": "{{tienda}} · {{stage}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "title": "EPC ajenos frente a lecturas propias",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 9
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "rate(traza_edge_reads_dropped_total{stage=\"epc_mask\"}[15m])",
+          "legendFormat": "ajenos",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(traza_edge_reads_total{stage=\"passed\"}[15m])",
+          "legendFormat": "propios",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "Tasa de duplicados suprimidos",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 9
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "rate(traza_edge_reads_dropped_total{stage=\"dedupe\"}[5m])",
+          "legendFormat": "{{tienda}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "title": "Tránsitos de portal por dirección",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 17
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "rate(traza_edge_portal_events_total[30m])",
+          "legendFormat": "{{direction}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "description": "Más indeterminados que salidas significa que las antenas están mal colocadas."
+    },
+    {
+      "id": 5,
+      "title": "Publicaciones del camino rápido",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 17
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "rate(traza_edge_portal_publish_total[30m])",
+          "legendFormat": "{{result}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      }
+    }
+  ]
+}
