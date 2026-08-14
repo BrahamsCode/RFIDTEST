@@ -179,10 +179,19 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
 - **Contexto**: `docs/06-backend-laravel.md` §4.4
 - **Entregable**: job con detección de clonación por TID y enrutado por tipo de dispositivo
 - **Aceptación**: un EPC con dos TID distintos genera alerta `tid_discrepante`
-- [~] Hechos: resolución de tags, registro de `unknown_epcs` y detección de
-  clonación por TID con alerta `tid_discrepante` (criterio de aceptación
-  cumplido). **Falta el enrutado por tipo de dispositivo**, que necesita
-  `InventoryCycleService` (tarea 3.1) y `PortalEventService` (tarea 6.x).
+- [x] Resolución de tags, `unknown_epcs`, clonación por TID con alerta
+  `tid_discrepante` y **el enrutado por tipo de dispositivo**, que ya se puede
+  hacer porque existen `InventoryCycleService` y `PortalEventService`.
+  - Handheld → las lecturas entran en el ciclo `en_curso` de su tienda. En
+    bloque y no una a una: `registerScans` deduplica y emite un solo evento de
+    avance, y con un evento por EPC un barrido de 20 000 prendas ahogaría al
+    navegador. Un ciclo **pausado** no las recibe: la pausa existe porque el
+    operario paró, y contarle lecturas la volvería inútil.
+  - Lector fijo → **no** genera eventos de portal desde aquí, y es
+    deliberado. El portal va por el camino rápido MQTT y ya escribió su
+    `portal_events` con dirección y confianza; reevaluarlo desde la ingesta
+    duplicaría la alarma y encima sin dirección, porque `tag_reads` no la
+    guarda: todo saldría como `indeterminado`.
 - **⚠️ Defecto de diseño en `docs/06` §4.4**: el job recibe `batchId` pero la
   consulta no filtra por él; selecciona por dispositivo y los últimos 10
   minutos. Con el borde vaciando cada segundo, cada lote reprocesa toda la
@@ -784,8 +793,25 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · 🔒 bloqueante · 
   `certs/` y `passwd`, y **ninguno existía**: el broker no habría arrancado.
   Se añaden la configuración de producción (solo 8883 con TLS, sin listener
   en claro) y la ACL por tienda, más un README con cómo generar los secretos.
-- **Faltan**: WireGuard en los bordes, escaneo de imágenes y `composer audit` /
-  `npm audit` en CI (tarea 0.4).
+- **Añadido**: etapa `security` en el pipeline con cuatro trabajos —
+  `composer audit`, auditoría de npm, escaneo de imágenes con Trivy y búsqueda
+  de secretos con gitleaks. Los dos primeros se ejecutaron aquí y encontraron
+  cosas de verdad:
+  - **Lo que se despliega está limpio de high/critical.** El borde da 0
+    vulnerabilidades en producción; la web, 2 moderadas en `react-router`.
+  - **Las críticas son de desarrollo**: servidor de Vite e interfaz de Vitest,
+    que no se ejecutan nunca en producción. Arreglarlas exige saltos de versión
+    mayor (Vite 5→8, Vitest 2→4) que contradicen las versiones fijadas en
+    `docs/08`, así que **no se tocan sin vuestra decisión**.
+  - **CVE-2026-48019 en Laravel** (inyección CRLF en la regla `email`) afecta a
+    todo 11.x sin arreglo dentro de la rama; el arreglo está en 12.60. Impacto
+    real aquí: **bajo**, porque la única validación `email` es la del acceso y
+    el sistema no envía correo con direcciones puestas por el usuario. Subir a
+    Laravel 12 es una decisión de alcance que os corresponde.
+  Por eso la auditoría de npm son **dos** trabajos: el de producción bloquea el
+  pipeline, el de desarrollo informa. Un pipeline que falla siempre acaba
+  ignorado, y entonces no avisa del día que sí importa.
+- **Faltan**: WireGuard en los bordes.
 
 ---
 

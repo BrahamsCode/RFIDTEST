@@ -16,6 +16,7 @@ use App\Models\ProductVariant;
 use App\Models\Tag;
 use App\Models\Zone;
 use App\Services\AlertService;
+use App\Services\InventoryCycleService;
 use App\Services\TagResolver;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -279,7 +280,7 @@ final class IngestReadsTest extends TestCase
             ->assertStatus(202);
 
         (new ProcessReadBatch('lote', $this->device->id))
-            ->handle(new TagResolver, new AlertService);
+            ->handle(new TagResolver, new AlertService, new InventoryCycleService);
 
         $unknown = DB::table('unknown_epcs')->where('epc', '3035D9000000000000000099')->first();
         $this->assertNotNull($unknown);
@@ -312,11 +313,139 @@ final class IngestReadsTest extends TestCase
         ]))->assertStatus(202);
 
         (new ProcessReadBatch('lote', $this->device->id))
-            ->handle(new TagResolver, new AlertService);
+            ->handle(new TagResolver, new AlertService, new InventoryCycleService);
 
         $alert = Alert::where('kind', AlertKind::TidDiscrepante)->first();
         $this->assertNotNull($alert, 'Debería haberse levantado una alerta de clonación.');
         $this->assertSame(1, $alert->severity, 'Una posible clonación es crítica.');
+    }
+
+    public function test_las_lecturas_del_handheld_entran_en_el_ciclo_en_curso(): void
+    {
+        /*
+         * Enrutado por tipo de dispositivo, tarea 2.2. El handheld también
+         * puede llamar directamente a `/inventory-cycles/{id}/scans`; que las
+         * lecturas ingeridas cuenten igual es lo que hace que un barrido no
+         * dependa de que la app acierte con el ciclo.
+         */
+        Queue::fake();
+
+        $handheld = Device::create([
+            'organization_id' => $this->organization->id,
+            'location_id' => $this->location->id,
+            'code' => 'HH-'.uniqid(), 'name' => 'Handheld', 'kind' => 'handheld',
+            'regulatory_region' => 'FCC-PE', 'status' => 'activo',
+            'api_token_hash' => Hash::make(self::TOKEN),
+        ]);
+
+        $tag = $this->stockTagForCycle();
+        $cycle = app(InventoryCycleService::class)->create($this->location, 'INV-'.uniqid());
+        DB::table('inventory_cycles')->where('id', $cycle->id)->update(['status' => 'en_curso']);
+
+        DB::table('tag_reads')->insert([
+            'device_id' => $handheld->id,
+            'location_id' => $this->location->id,
+            'epc' => $tag->epc,
+            'rssi' => -50,
+            'read_at' => now(),
+            'ingested_at' => now(),
+        ]);
+
+        (new ProcessReadBatch('lote', $handheld->id))
+            ->handle(new TagResolver, new AlertService, app(InventoryCycleService::class));
+
+        $this->assertSame(
+            1,
+            DB::table('inventory_cycle_scans')->where('inventory_cycle_id', $cycle->id)->count(),
+        );
+    }
+
+    public function test_un_ciclo_pausado_no_recibe_lecturas(): void
+    {
+        // La pausa existe porque el operario paró para atender a alguien.
+        // Seguir contándole lecturas la volvería inútil.
+        Queue::fake();
+
+        $handheld = Device::create([
+            'organization_id' => $this->organization->id,
+            'location_id' => $this->location->id,
+            'code' => 'HH-'.uniqid(), 'name' => 'Handheld', 'kind' => 'handheld',
+            'regulatory_region' => 'FCC-PE', 'status' => 'activo',
+            'api_token_hash' => Hash::make(self::TOKEN),
+        ]);
+
+        $tag = $this->stockTagForCycle();
+        $cycle = app(InventoryCycleService::class)->create($this->location, 'INV-'.uniqid());
+        DB::table('inventory_cycles')->where('id', $cycle->id)->update(['status' => 'pausado']);
+
+        DB::table('tag_reads')->insert([
+            'device_id' => $handheld->id,
+            'location_id' => $this->location->id,
+            'epc' => $tag->epc,
+            'rssi' => -50,
+            'read_at' => now(),
+            'ingested_at' => now(),
+        ]);
+
+        (new ProcessReadBatch('lote', $handheld->id))
+            ->handle(new TagResolver, new AlertService, app(InventoryCycleService::class));
+
+        $this->assertSame(
+            0,
+            DB::table('inventory_cycle_scans')->where('inventory_cycle_id', $cycle->id)->count(),
+        );
+    }
+
+    public function test_un_lector_fijo_no_crea_eventos_de_portal_desde_la_ingesta(): void
+    {
+        /*
+         * El portal va por el camino rápido MQTT y ya escribió su
+         * `portal_events` con dirección y confianza. Evaluarlo otra vez desde
+         * la ingesta duplicaría la alarma, y encima sin dirección —`tag_reads`
+         * no la guarda—, así que todo saldría como `indeterminado`.
+         */
+        Queue::fake();
+
+        $portal = Device::create([
+            'organization_id' => $this->organization->id,
+            'location_id' => $this->location->id,
+            'code' => 'PORT-'.uniqid(), 'name' => 'Portal', 'kind' => 'lector_fijo',
+            'regulatory_region' => 'FCC-PE', 'status' => 'activo',
+            'api_token_hash' => Hash::make(self::TOKEN),
+        ]);
+
+        $tag = $this->stockTagForCycle();
+
+        DB::table('tag_reads')->insert([
+            'device_id' => $portal->id,
+            'location_id' => $this->location->id,
+            'epc' => $tag->epc,
+            'rssi' => -50,
+            'read_at' => now(),
+            'ingested_at' => now(),
+        ]);
+
+        (new ProcessReadBatch('lote', $portal->id))
+            ->handle(new TagResolver, new AlertService, app(InventoryCycleService::class));
+
+        $this->assertSame(0, DB::table('portal_events')->count());
+    }
+
+    private function stockTagForCycle(): Tag
+    {
+        $product = Product::create([
+            'organization_id' => $this->organization->id,
+            'code' => 'P-'.uniqid(), 'name' => 'Polo',
+        ]);
+        $variant = ProductVariant::create(['product_id' => $product->id, 'sku' => 'SKU-'.uniqid()]);
+
+        return Tag::create([
+            'organization_id' => $this->organization->id,
+            'epc' => '3035D9'.strtoupper(bin2hex(random_bytes(9))),
+            'product_variant_id' => $variant->id,
+            'state' => 'en_stock',
+            'current_location_id' => $this->location->id,
+        ]);
     }
 
     public function test_no_alerta_cuando_el_tid_coincide(): void
@@ -343,7 +472,7 @@ final class IngestReadsTest extends TestCase
         $this->ingest($this->payload(reads: [$this->read($epc, tid: $tid)]))->assertStatus(202);
 
         (new ProcessReadBatch('lote', $this->device->id))
-            ->handle(new TagResolver, new AlertService);
+            ->handle(new TagResolver, new AlertService, new InventoryCycleService);
 
         $this->assertSame(0, Alert::where('kind', AlertKind::TidDiscrepante)->count());
     }

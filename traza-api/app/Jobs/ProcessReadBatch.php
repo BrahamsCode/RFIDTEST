@@ -7,7 +7,9 @@ namespace App\Jobs;
 use App\Enums\AlertKind;
 use App\Enums\DeviceKind;
 use App\Models\Device;
+use App\Models\InventoryCycle;
 use App\Services\AlertService;
+use App\Services\InventoryCycleService;
 use App\Services\TagResolver;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -17,10 +19,8 @@ use Illuminate\Support\Facades\DB;
 /**
  * Procesa las lecturas ya guardadas de un lote. Ver `docs/06` §4.4.
  *
- * Alcance actual (tarea 2.2 parcial): resolución de tags, registro de EPC
- * desconocidos y detección de clonación por TID. El enrutado por tipo de
- * dispositivo queda pendiente de que existan `InventoryCycleService`
- * (tarea 3.1) y `PortalEventService` (tarea 6.x).
+ * Resuelve tags, registra los EPC desconocidos, detecta clonación por TID y
+ * enruta según el tipo de dispositivo.
  */
 final class ProcessReadBatch implements ShouldQueue
 {
@@ -35,8 +35,11 @@ final class ProcessReadBatch implements ShouldQueue
         public readonly int $deviceId,
     ) {}
 
-    public function handle(TagResolver $resolver, AlertService $alerts): void
-    {
+    public function handle(
+        TagResolver $resolver,
+        AlertService $alerts,
+        InventoryCycleService $cycles,
+    ): void {
         $device = Device::find($this->deviceId);
 
         if ($device === null) {
@@ -61,6 +64,14 @@ final class ProcessReadBatch implements ShouldQueue
             ->orderBy('read_at')
             ->get();
 
+        // Se resuelve una vez por lote, no por EPC: en un barrido son miles
+        // de EPC y todos van al mismo ciclo.
+        $cycle = $device->kind === DeviceKind::Handheld
+            ? $this->activeCycleFor($device)
+            : null;
+
+        $scanned = [];
+
         foreach ($reads->groupBy('epc') as $epc => $epcReads) {
             $tag = $resolver->find($device->organization_id, (string) $epc);
 
@@ -73,13 +84,52 @@ final class ProcessReadBatch implements ShouldQueue
             $this->detectCloning($tag, $epcReads, $device, $alerts);
 
             match ($device->kind) {
-                // Pendiente: InventoryCycleService::registerScan() (tarea 3.1)
-                DeviceKind::Handheld => null,
-                // Pendiente: PortalEventService::evaluate() (tarea 6.x)
-                DeviceKind::LectorFijo => null,
+                DeviceKind::Handheld => $scanned[] = ['epc' => (string) $epc],
+
+                /*
+                 * Los lectores fijos **no** generan aquí eventos de portal.
+                 * El portal va por el camino rápido MQTT de `docs/07` §6 y
+                 * ya escribió su `portal_events` con dirección y confianza;
+                 * volver a evaluarlo desde la ingesta duplicaría la alarma y,
+                 * peor, lo haría sin dirección —`tag_reads` no la guarda—, así
+                 * que todo saldría como `indeterminado`.
+                 *
+                 * Lo que sí aporta esta vía es la presencia: la lectura ya
+                 * quedó en `tag_reads` y `TagResolver` refrescó
+                 * `last_seen_at`.
+                 */
+                DeviceKind::LectorFijo, DeviceKind::Edge => null,
+
                 default => null,
             };
         }
+
+        if ($cycle !== null && $scanned !== []) {
+            // En bloque y no uno a uno: `registerScans` deduplica y emite un
+            // solo evento de avance por lote. Con un evento por EPC, un
+            // barrido de 20 000 prendas ahogaría al navegador.
+            $cycles->registerScans($cycle, $scanned, $device->id);
+        }
+    }
+
+    /**
+     * Ciclo en curso de la tienda del handheld.
+     *
+     * Solo `en_curso`: un ciclo pausado está pausado a propósito —el operario
+     * paró para atender a un cliente— y seguir contándole lecturas haría que
+     * la pausa no sirviera de nada.
+     */
+    private function activeCycleFor(Device $device): ?InventoryCycle
+    {
+        if ($device->location_id === null) {
+            return null;
+        }
+
+        return InventoryCycle::query()
+            ->where('location_id', $device->location_id)
+            ->where('status', 'en_curso')
+            ->orderByDesc('id')
+            ->first();
     }
 
     /**

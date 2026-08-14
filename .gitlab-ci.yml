@@ -14,7 +14,7 @@
 #      `core:` son Kotlin JVM puro y se prueban sin SDK de Android; el APK
 #      necesita el SDK y va en un trabajo aparte que solo corre en `main`.
 
-stages: [lint, test, build]
+stages: [lint, test, security, build]
 
 variables:
   DOCKER_BUILDKIT: "1"
@@ -166,6 +166,85 @@ test:carga:
   # siempre y el pipeline se acabaría ignorando entero.
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" && $RUN_LOAD_TESTS == "true"'
+
+# ------------------------------------------------------------ SEGURIDAD
+#
+# Lista de verificación de `docs/12` §8. Estos trabajos no bloquean el
+# pipeline por diseño: una CVE publicada anoche en una dependencia transitiva
+# no debe impedir desplegar un arreglo urgente. Lo que sí hacen es dejar el
+# informe en el trabajo, para que la revisión sea una decisión y no un olvido.
+
+security:composer-audit:
+  stage: security
+  image: php:8.4-cli-alpine
+  before_script:
+    - apk add --no-cache git unzip
+    - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+    - cd traza-api && composer install --no-interaction --no-progress
+  script:
+    - composer audit --format=plain
+  allow_failure: true
+  cache:
+    key: composer-$CI_COMMIT_REF_SLUG
+    paths: [traza-api/vendor]
+
+# Dos trabajos y no uno, porque no es lo mismo.
+#
+# Lo que se despliega SÍ bloquea: una CVE crítica en una dependencia que va
+# dentro del contenedor es un problema de producción. Hoy el borde sale
+# limpio y la web tiene dos moderadas en react-router.
+security:npm-audit-produccion:
+  stage: security
+  image: node:22-alpine
+  before_script:
+    - apk add --no-cache python3 make g++
+  script:
+    - cd traza-edge && npm ci && npm audit --omit=dev --audit-level=high
+    - cd ../traza-web && npm ci && npm audit --omit=dev --audit-level=high
+  allow_failure: false
+
+# Las de desarrollo informan y no bloquean. Las críticas de hoy están en el
+# servidor de desarrollo de Vite y en la interfaz de Vitest: ninguno de los
+# dos se ejecuta jamás en producción, y arreglarlas exige saltos de versión
+# mayor que contradicen las versiones fijadas en `docs/08`.
+security:npm-audit-desarrollo:
+  stage: security
+  image: node:22-alpine
+  before_script:
+    - apk add --no-cache python3 make g++
+  script:
+    - cd traza-edge && npm ci && npm audit --audit-level=high || true
+    - cd ../traza-web && npm ci && npm audit --audit-level=high || true
+  allow_failure: true
+
+# Escaneo de las imágenes que se van a desplegar de verdad, no de un
+# Dockerfile leído en frío: lo que importa son las capas base y los paquetes
+# del sistema que acaban en producción.
+security:imagenes:
+  stage: security
+  image: docker:27
+  services: [docker:27-dind]
+  before_script:
+    - apk add --no-cache curl
+    - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh
+        | sh -s -- -b /usr/local/bin
+  script:
+    - docker build --target production -t traza-api:scan ./traza-api
+    - docker build --target production -t traza-edge:scan ./traza-edge
+    - trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 0 traza-api:scan
+    - trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 0 traza-edge:scan
+  allow_failure: true
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# Secretos en el historial. Este SÍ bloquea: un token filtrado no se arregla
+# borrando el commit, hay que rotarlo, y cuanto antes se sepa mejor.
+security:secretos:
+  stage: security
+  image: zricethezav/gitleaks:latest
+  script:
+    - gitleaks detect --source . --redact --verbose --no-banner
+  allow_failure: false
 
 # ---------------------------------------------------------------- BUILD
 
